@@ -12,7 +12,7 @@ public class FlightLegTest {
         ZonedDateTime departure = ZonedDateTime.of(2026, 8, 1, 22, 0, 0, 0, ZoneId.of("America/Anchorage"));
         ZonedDateTime arrival = departure.toInstant().plusSeconds(5 * 3600 + 25 * 60).atZone(ZoneId.of("Asia/Seoul"));
         return new FlightLeg("5X1", "ANC", "ICN", departure, arrival,
-                departure, arrival, assignment, "test");
+                departure, arrival, assignment, "test", null);
     }
 
     @Test public void appliesSeatPositionRules() {

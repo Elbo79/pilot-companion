@@ -27,4 +27,11 @@ public class ScheduleRepositoryTest {
         assertEquals("RO", repository.forDate(LocalDate.of(2026, 8, 10)).get(0).seatPosition());
         assertEquals("DH", repository.forDate(LocalDate.of(2026, 9, 6)).get(0).seatPosition());
     }
+
+    @Test public void associatesFollowingHotelWithLeg() {
+        assertEquals("Sheraton Incheon",
+                repository.forDate(LocalDate.of(2026, 8, 6)).get(0).hotel());
+        assertEquals("Ala Moana Honolulu by Mantra",
+                repository.forDate(LocalDate.of(2026, 9, 5)).get(0).hotel());
+    }
 }

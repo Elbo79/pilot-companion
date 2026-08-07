@@ -8,7 +8,7 @@ import java.util.Locale;
 public record FlightLeg(String flightNumber, String origin, String destination,
         ZonedDateTime departure, ZonedDateTime arrival,
         ZonedDateTime scheduledDeparture, ZonedDateTime scheduledArrival,
-        String assignment, String source) {
+        String assignment, String source, String hotel) {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.US);
 
     public String seatPosition() {

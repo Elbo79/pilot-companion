@@ -14,27 +14,28 @@ final class ScheduleRepository {
     private final Map<LocalDate, List<FlightLeg>> schedule = new HashMap<>();
 
     ScheduleRepository() {
-        addUtc("UPS52", "ANC", "HKG", "2026-08-03T18:47", "2026-08-04T04:44", "2026-08-03T18:08", "2026-08-04T05:10", "F/O", "Crew Access revision");
-        addUtc("UPS67", "HKG", "ICN", "2026-08-06T02:37", "2026-08-06T06:18", "2026-08-06T02:15", "2026-08-06T05:45", "F/O", "Crew Access revision");
-        addUtc("UPS6011", "ICN", "DEL", "2026-08-08T01:19", "2026-08-08T08:46", null, null, "F/O", "Crew Access");
-        addUtc("UPS15", "DEL", "CGN", "2026-08-09T08:10", "2026-08-09T17:06", null, null, "F/O", "Crew Access");
-        addUtc("UPS224", "CGN", "SDF", "2026-08-10T17:25", "2026-08-11T02:17", null, null, "R/O", "Crew Access");
-        addUtc("UPS5074", "SDF", "ANC", "2026-08-11T19:50", "2026-08-12T02:44", null, null, "DH", "Crew Access");
+        addUtc("UPS52", "ANC", "HKG", "2026-08-03T18:47", "2026-08-04T04:44", "2026-08-03T18:08", "2026-08-04T05:10", "F/O", "Crew Access revision", "New World Millennium Hong Kong");
+        addUtc("UPS67", "HKG", "ICN", "2026-08-06T02:37", "2026-08-06T06:18", "2026-08-06T02:15", "2026-08-06T05:45", "F/O", "Crew Access revision", "Sheraton Incheon");
+        addUtc("UPS6011", "ICN", "DEL", "2026-08-08T01:19", "2026-08-08T08:46", null, null, "F/O", "Crew Access", "Andaz Delhi");
+        addUtc("UPS15", "DEL", "CGN", "2026-08-09T08:10", "2026-08-09T17:06", null, null, "F/O", "Crew Access", "Cologne Marriott Hotel");
+        addUtc("UPS224", "CGN", "SDF", "2026-08-10T17:25", "2026-08-11T02:17", null, null, "R/O", "Crew Access", "Galt House");
+        addUtc("UPS5074", "SDF", "ANC", "2026-08-11T19:50", "2026-08-12T02:44", null, null, "DH", "Crew Access", null);
 
-        addUtc("UPS64", "ANC", "ICN", "2026-08-19T17:37", "2026-08-20T02:25", null, null, "F/O", "Crew Access");
-        addUtc("UPS11", "ICN", "DEL", "2026-08-21T02:33", "2026-08-21T10:00", null, null, "R/O", "Crew Access");
-        addUtc("UPS17", "DEL", "CGN", "2026-08-23T13:00", "2026-08-23T21:56", null, null, "R/O", "Crew Access");
-        addUtc("UPS14", "CGN", "SZX", "2026-08-25T03:47", "2026-08-25T15:30", null, null, "F/O", "Crew Access");
-        addUtc("UPS77", "SZX", "ANC", "2026-08-26T11:10", "2026-08-26T21:13", null, null, "F/O", "Crew Access");
+        addUtc("UPS64", "ANC", "ICN", "2026-08-19T17:37", "2026-08-20T02:25", null, null, "F/O", "Crew Access", "Sheraton Incheon");
+        addUtc("UPS11", "ICN", "DEL", "2026-08-21T02:33", "2026-08-21T10:00", null, null, "R/O", "Crew Access", "Andaz Delhi");
+        addUtc("UPS17", "DEL", "CGN", "2026-08-23T13:00", "2026-08-23T21:56", null, null, "R/O", "Crew Access", "Cologne Marriott Hotel");
+        addUtc("UPS14", "CGN", "SZX", "2026-08-25T03:47", "2026-08-25T15:30", null, null, "F/O", "Crew Access", "JW Marriott Shenzhen");
+        addUtc("UPS77", "SZX", "ANC", "2026-08-26T11:10", "2026-08-26T21:13", null, null, "F/O", "Crew Access", null);
 
-        addUtc("UPS197", "ANC", "SDF", "2026-09-04T07:13", "2026-09-04T13:26", null, null, "F/O", "Crew Access");
-        addUtc("UPS36", "SDF", "HNL", "2026-09-05T11:26", "2026-09-05T20:31", null, null, "F/O", "Crew Access");
-        addUtc("UPS35", "HNL", "ICN", "2026-09-07T06:45", "2026-09-07T16:20", null, null, "DH", "Crew Access revision");
-        addUtc("UPS99", "ICN", "ANC", "2026-09-08T12:50", "2026-09-08T20:51", null, null, "F/O", "Crew Access revision");
+        addUtc("UPS197", "ANC", "SDF", "2026-09-04T07:13", "2026-09-04T13:26", null, null, "F/O", "Crew Access", "Galt House");
+        addUtc("UPS36", "SDF", "HNL", "2026-09-05T11:26", "2026-09-05T20:31", null, null, "F/O", "Crew Access", "Ala Moana Honolulu by Mantra");
+        addUtc("UPS35", "HNL", "ICN", "2026-09-07T06:45", "2026-09-07T16:20", null, null, "DH", "Crew Access revision", "Sheraton Incheon");
+        addUtc("UPS99", "ICN", "ANC", "2026-09-08T12:50", "2026-09-08T20:51", null, null, "F/O", "Crew Access revision", null);
     }
 
     private void addUtc(String number, String from, String to, String actualOut, String actualIn,
-                        String scheduledOut, String scheduledIn, String assignment, String source) {
+                        String scheduledOut, String scheduledIn, String assignment, String source,
+                        String hotel) {
         ZonedDateTime departure = ZonedDateTime.parse(actualOut + "Z").withZoneSameInstant(airportZone(from));
         ZonedDateTime arrival = ZonedDateTime.parse(actualIn + "Z").withZoneSameInstant(airportZone(to));
         ZonedDateTime scheduledDeparture = scheduledOut == null ? departure
@@ -42,7 +43,7 @@ final class ScheduleRepository {
         ZonedDateTime scheduledArrival = scheduledIn == null ? arrival
                 : ZonedDateTime.parse(scheduledIn + "Z").withZoneSameInstant(airportZone(to));
         FlightLeg leg = new FlightLeg(number, from, to, departure, arrival,
-                scheduledDeparture, scheduledArrival, assignment, source);
+                scheduledDeparture, scheduledArrival, assignment, source, hotel);
         schedule.computeIfAbsent(departure.toLocalDate(), ignored -> new ArrayList<>()).add(leg);
     }
 

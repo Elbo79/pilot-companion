@@ -2,12 +2,16 @@ package com.pilotcompanion.app;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -19,6 +23,14 @@ public final class MainActivity extends Activity {
     private TextView monthTitle;
     private MonthCalendarView calendar;
     private LinearLayout detailPanel;
+    private LocalDate selectedDate;
+    private final Handler clockHandler = new Handler(Looper.getMainLooper());
+    private final Runnable clockTick = new Runnable() {
+        @Override public void run() {
+            if (selectedDate != null) showDay(selectedDate);
+            clockHandler.postDelayed(this, 60_000);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,6 +39,17 @@ public final class MainActivity extends Activity {
         setContentView(buildScreen());
         showMonth();
         showDay(repository.firstScheduledDate());
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        clockHandler.removeCallbacks(clockTick);
+        clockHandler.post(clockTick);
+    }
+
+    @Override protected void onPause() {
+        clockHandler.removeCallbacks(clockTick);
+        super.onPause();
     }
 
     private View buildScreen() {
@@ -71,6 +94,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showDay(LocalDate date) {
+        selectedDate = date;
         detailPanel.removeAllViews();
         detailPanel.addView(label(date.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)), 17, 0xFFFFFFFF));
         var legs = repository.forDate(date);
@@ -81,13 +105,36 @@ public final class MainActivity extends Activity {
         for (FlightLeg leg : legs) {
             detailPanel.addView(label(leg.flightNumber() + "  " + leg.origin() + " > "
                     + leg.destination() + "   " + leg.seatPosition(), 16, 0xFF68D8FF));
-            detailPanel.addView(label("Local  " + leg.localTimes() + "     Flight  "
-                    + leg.flightTime(), 14, 0xFFFFFFFF));
+            detailPanel.addView(label(departureStatus(leg), 14, 0xFFFFC857));
+            detailPanel.addView(label("Local " + leg.localTimes() + "  |  Block "
+                    + leg.flightTime() + "  |  Seat " + leg.seatPosition(), 13, 0xFFFFFFFF));
+            if (leg.hotel() != null) {
+                detailPanel.addView(label("Hotel: " + leg.hotel(), 13, 0xFFB8E986));
+            }
             String source = leg.isRevised()
                     ? "REVISED - previously " + leg.scheduledLocalTimes()
                     : leg.source();
             detailPanel.addView(label(source, 11, leg.isRevised() ? 0xFFFFC857 : 0xFF9FB3C8));
         }
+    }
+
+    private String departureStatus(FlightLeg leg) {
+        Instant now = Instant.now();
+        if (now.isBefore(leg.departure().toInstant())) {
+            return "Departs in " + compactDuration(Duration.between(now, leg.departure().toInstant()));
+        }
+        if (now.isBefore(leg.arrival().toInstant())) {
+            return "In progress - arrives in " + compactDuration(Duration.between(now, leg.arrival().toInstant()));
+        }
+        return "Departed " + compactDuration(Duration.between(leg.departure().toInstant(), now)) + " ago";
+    }
+
+    private String compactDuration(Duration duration) {
+        long days = duration.toDays();
+        long hours = duration.minusDays(days).toHours();
+        long minutes = duration.minusDays(days).minusHours(hours).toMinutes();
+        if (days > 0) return days + "d " + hours + "h " + minutes + "m";
+        return hours + "h " + minutes + "m";
     }
 
     private TextView label(String text, int sp, int color) {

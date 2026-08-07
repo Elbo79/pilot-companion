@@ -9,6 +9,8 @@ Pilot Companion is an Android month-view planner for flight schedules. The first
 
 Version 0.2 contains the August-September 2026 schedule transcribed from the supplied Flight Ops and Crew Access screenshots. Crew Access is authoritative when it revises an awarded leg; revised times are highlighted while the original scheduled values remain available for comparison.
 
+Version 0.3 restores the operational leg card. Tap a scheduled calendar day to see a live time-to-departure countdown, local times, block time, seat position, revision status, and the following hotel when one is listed in Crew Access.
+
 ### Schedule source rules
 
 - Flight Ops pairing detail is the original awarded schedule.

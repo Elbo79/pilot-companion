@@ -7,10 +7,11 @@ Version 0.2 loaded the August-September 2026 schedule from supplied Flight Ops a
 ## Milestone 2 / Version 0.4
 
 - Schedule changes are explicit data states instead of being inferred only from time differences.
-- **Blue = TRADED**: pilot-initiated trades.
+- **Blue = TRADED**: pilot-initiated trades made before the trip starts.
 - **Yellow = REVISED**: company-initiated revisions.
+- **Post-start rule:** once a trip has started, any later change to that trip is classified as **REVISED** and displayed yellow.
 - The approved Aug 7 trade replaces A70746 with **A70327R** and loads the current Crew Access legs ANC-SDF-CGN-SZX-ANC.
-- A70327R is marked TRADED throughout the month and detail views.
+- A70327R is marked TRADED throughout the month and detail views until a post-start change occurs; a post-start change is REVISED.
 - Pairing number is displayed with traded legs.
 - The data model is prepared for a shared schedule source so a spouse/family installation can read the same roster.
 
@@ -22,8 +23,9 @@ The next sync step is a single cloud schedule document/account shared by the pil
 
 - Flight Ops pairing detail is the original awarded schedule.
 - Crew Access is the current operational schedule and overrides matching awarded legs.
-- Trade confirmations identify pilot-initiated TRADED pairings.
-- Company changes are REVISED, independently of trades.
+- Trade confirmations identify pilot-initiated TRADED pairings before trip start.
+- Once the trip has started, any detected schedule change is REVISED.
+- Company changes before trip start are also REVISED.
 - Source timestamps are converted to local time at each endpoint using the airport time zone.
 - Position labels follow: `DH`, `FO2`, and `IRO`/`RO`; all other labels display as `FO`.
 

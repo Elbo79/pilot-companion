@@ -15,7 +15,7 @@ import java.util.Locale;
 
 public final class MainActivity extends Activity {
     private final ScheduleRepository repository = new ScheduleRepository();
-    private YearMonth visibleMonth = YearMonth.now();
+    private YearMonth visibleMonth;
     private TextView monthTitle;
     private MonthCalendarView calendar;
     private LinearLayout detailPanel;
@@ -23,9 +23,10 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        visibleMonth = YearMonth.from(repository.firstScheduledDate());
         setContentView(buildScreen());
         showMonth();
-        showDay(LocalDate.now());
+        showDay(repository.firstScheduledDate());
     }
 
     private View buildScreen() {
@@ -40,10 +41,10 @@ public final class MainActivity extends Activity {
 
         LinearLayout controls = new LinearLayout(this);
         controls.setGravity(Gravity.CENTER_VERTICAL);
-        Button previous = button("‹");
+        Button previous = button("<");
         monthTitle = label("", 25, 0xFFFFFFFF);
         monthTitle.setGravity(Gravity.CENTER);
-        Button next = button("›");
+        Button next = button(">");
         controls.addView(previous, new LinearLayout.LayoutParams(dp(48), dp(48)));
         controls.addView(monthTitle, new LinearLayout.LayoutParams(0, dp(58), 1));
         controls.addView(next, new LinearLayout.LayoutParams(dp(48), dp(48)));
@@ -55,9 +56,9 @@ public final class MainActivity extends Activity {
 
         detailPanel = new LinearLayout(this);
         detailPanel.setOrientation(LinearLayout.VERTICAL);
-        detailPanel.setPadding(dp(14), dp(10), dp(14), dp(10));
+        detailPanel.setPadding(dp(14), dp(8), dp(14), dp(8));
         detailPanel.setBackgroundColor(0xFF102A43);
-        root.addView(detailPanel, new LinearLayout.LayoutParams(-1, dp(124)));
+        root.addView(detailPanel, new LinearLayout.LayoutParams(-1, dp(142)));
 
         previous.setOnClickListener(v -> { visibleMonth = visibleMonth.minusMonths(1); showMonth(); });
         next.setOnClickListener(v -> { visibleMonth = visibleMonth.plusMonths(1); showMonth(); });
@@ -78,10 +79,14 @@ public final class MainActivity extends Activity {
             return;
         }
         for (FlightLeg leg : legs) {
-            detailPanel.addView(label(
-                    leg.flightNumber() + "  " + leg.origin() + " → " + leg.destination() + "   " + leg.seatPosition(),
-                    16, 0xFF68D8FF));
-            detailPanel.addView(label("Local  " + leg.localTimes() + "     Flight  " + leg.flightTime(), 14, 0xFFFFFFFF));
+            detailPanel.addView(label(leg.flightNumber() + "  " + leg.origin() + " > "
+                    + leg.destination() + "   " + leg.seatPosition(), 16, 0xFF68D8FF));
+            detailPanel.addView(label("Local  " + leg.localTimes() + "     Flight  "
+                    + leg.flightTime(), 14, 0xFFFFFFFF));
+            String source = leg.isRevised()
+                    ? "REVISED - previously " + leg.scheduledLocalTimes()
+                    : leg.source();
+            detailPanel.addView(label(source, 11, leg.isRevised() ? 0xFFFFC857 : 0xFF9FB3C8));
         }
     }
 

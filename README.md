@@ -7,7 +7,15 @@ Pilot Companion is an Android month-view planner for flight schedules. The first
 - seat positions using the planner rules: `IRO` → `RO`, `FO2` → `FO2`, deadhead → `DH`, and every other assignment → `FO`;
 - previous/next month navigation.
 
-The current schedule is demonstration data in `ScheduleRepository`. A future Crew Access importer can replace that data source without changing the calendar UI or flight calculations.
+Version 0.2 contains the August-September 2026 schedule transcribed from the supplied Flight Ops and Crew Access screenshots. Crew Access is authoritative when it revises an awarded leg; revised times are highlighted while the original scheduled values remain available for comparison.
+
+### Schedule source rules
+
+- Flight Ops pairing detail is the original awarded schedule.
+- Crew Access is the current operational schedule and overrides matching awarded legs.
+- Source timestamps are converted to local time at each endpoint using the airport time zone.
+- Crew Access-only legs, including added deadheads, are added to the roster.
+- Position labels follow: `DH`, `FO2`, and `IRO`/`RO`; all other labels display as `FO`.
 
 ## Install the latest debug APK
 

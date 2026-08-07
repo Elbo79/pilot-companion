@@ -18,23 +18,18 @@ final class MonthCalendarView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final ScheduleRepository repository;
     private YearMonth month = YearMonth.now();
-    private LocalDate selected = LocalDate.now();
+    private LocalDate selected;
     private Consumer<LocalDate> listener = ignored -> { };
 
     MonthCalendarView(Context context, ScheduleRepository repository) {
         super(context);
         this.repository = repository;
+        selected = repository.firstScheduledDate();
         paint.setTypeface(android.graphics.Typeface.create("sans", android.graphics.Typeface.NORMAL));
     }
 
-    void setMonth(YearMonth month) {
-        this.month = month;
-        invalidate();
-    }
-
-    void setOnDateSelectedListener(Consumer<LocalDate> listener) {
-        this.listener = listener;
-    }
+    void setMonth(YearMonth month) { this.month = month; invalidate(); }
+    void setOnDateSelectedListener(Consumer<LocalDate> listener) { this.listener = listener; }
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -42,7 +37,6 @@ final class MonthCalendarView extends View {
         float cellWidth = getWidth() / 7f;
         float header = dp(30);
         float cellHeight = (getHeight() - header) / 6f;
-
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setTextSize(dp(11));
         paint.setColor(0xFF9FB3C8);
@@ -60,7 +54,6 @@ final class MonthCalendarView extends View {
             float left = column * cellWidth;
             float top = header + row * cellHeight;
             LocalDate date = month.atDay(day);
-
             if (date.equals(selected)) {
                 paint.setColor(0xFF1F5A78);
                 canvas.drawRoundRect(left + dp(2), top + dp(2), left + cellWidth - dp(2),
@@ -71,7 +64,6 @@ final class MonthCalendarView extends View {
             paint.setColor(0xFF27445F);
             canvas.drawRect(left, top, left + cellWidth, top + cellHeight, paint);
             paint.setStyle(Paint.Style.FILL);
-
             paint.setTextAlign(Paint.Align.LEFT);
             paint.setTextSize(dp(13));
             paint.setColor(date.equals(LocalDate.now()) ? 0xFF68D8FF : Color.WHITE);
@@ -81,11 +73,12 @@ final class MonthCalendarView extends View {
             if (!legs.isEmpty()) {
                 FlightLeg leg = legs.get(0);
                 paint.setTextSize(dp(9));
-                paint.setColor(0xFF68D8FF);
-                canvas.drawText(leg.origin() + "→" + leg.destination(), left + dp(5), top + dp(35), paint);
+                paint.setColor(leg.isRevised() ? 0xFFFFC857 : 0xFF68D8FF);
+                canvas.drawText(leg.origin() + ">" + leg.destination(), left + dp(5), top + dp(35), paint);
                 paint.setColor(0xFFE8F1F8);
                 canvas.drawText(leg.localTimes(), left + dp(5), top + dp(48), paint);
-                canvas.drawText(leg.seatPosition() + " · " + leg.flightTime(), left + dp(5), top + dp(61), paint);
+                canvas.drawText(leg.seatPosition() + (leg.isRevised() ? " REV " : "  ")
+                        + leg.flightTime(), left + dp(5), top + dp(61), paint);
             }
         }
     }
@@ -108,13 +101,6 @@ final class MonthCalendarView extends View {
         return true;
     }
 
-    @Override
-    public boolean performClick() {
-        super.performClick();
-        return true;
-    }
-
-    private float dp(float value) {
-        return value * getResources().getDisplayMetrics().density;
-    }
+    @Override public boolean performClick() { super.performClick(); return true; }
+    private float dp(float value) { return value * getResources().getDisplayMetrics().density; }
 }

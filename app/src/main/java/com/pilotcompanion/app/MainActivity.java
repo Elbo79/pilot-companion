@@ -53,7 +53,7 @@ public final class MainActivity extends Activity {
         root.addView(calendar, new LinearLayout.LayoutParams(-1, 0, 1));
         detailPanel = new LinearLayout(this); detailPanel.setOrientation(LinearLayout.VERTICAL);
         detailPanel.setPadding(dp(14), dp(8), dp(14), dp(8)); detailPanel.setBackgroundColor(0xFF102A43);
-        root.addView(detailPanel, new LinearLayout.LayoutParams(-1, dp(160)));
+        root.addView(detailPanel, new LinearLayout.LayoutParams(-1, dp(175)));
         previous.setOnClickListener(v -> { visibleMonth = visibleMonth.minusMonths(1); showMonth(); });
         next.setOnClickListener(v -> { visibleMonth = visibleMonth.plusMonths(1); showMonth(); }); return root;
     }
@@ -73,9 +73,20 @@ public final class MainActivity extends Activity {
             detailPanel.addView(label(departureStatus(leg), 14, 0xFFE8F1F8));
             detailPanel.addView(label("Local " + leg.localTimes() + "  |  Block " + leg.flightTime() + "  |  Seat " + leg.seatPosition(), 13, 0xFFFFFFFF));
             if (leg.hotel() != null) detailPanel.addView(label("Hotel: " + leg.hotel(), 13, 0xFFB8E986));
-            String source = leg.isRevised() ? "Company revised - previously " + leg.scheduledLocalTimes() : leg.source();
-            detailPanel.addView(label(source, 11, stateColor));
+            detailPanel.addView(label(revisionDescription(leg), 11, stateColor));
         }
+    }
+
+    private String revisionDescription(FlightLeg leg) {
+        if (!leg.isRevised()) return leg.source();
+        if ("Unacknowledged Roster Changes".equals(leg.source())) {
+            return "Company revision after trip start • Crew Access roster change";
+        }
+        if (leg.scheduledDeparture().toInstant().equals(leg.departure().toInstant())
+                && leg.scheduledArrival().toInstant().equals(leg.arrival().toInstant())) {
+            return "Company revised • " + leg.source();
+        }
+        return "Company revised - previously " + leg.scheduledLocalTimes();
     }
 
     private String departureStatus(FlightLeg leg) {

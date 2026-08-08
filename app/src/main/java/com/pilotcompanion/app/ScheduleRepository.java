@@ -16,10 +16,14 @@ final class ScheduleRepository {
     ScheduleRepository() {
         addUtc("UPS52", "ANC", "HKG", "2026-08-03T18:47", "2026-08-04T04:44", "2026-08-03T18:08", "2026-08-04T05:10", "F/O", "Crew Access revision", "New World Millennium Hong Kong", FlightLeg.ChangeType.REVISED, "");
         addUtc("UPS67", "HKG", "ICN", "2026-08-06T02:37", "2026-08-06T06:18", "2026-08-06T02:15", "2026-08-06T05:45", "F/O", "Crew Access revision", "Sheraton Incheon", FlightLeg.ChangeType.REVISED, "");
-        addUtc("UPS6011", "ICN", "DEL", "2026-08-08T01:19", "2026-08-08T08:46", null, null, "F/O", "Crew Access", "Andaz Delhi", FlightLeg.ChangeType.ORIGINAL, "");
+        addUtc("UPS6011", "ICN", "DEL", "2026-08-08T01:19", "2026-08-08T08:46", null, null, "F/O", "Crew Access", "Andaz Delhi", FlightLeg.ChangeType.REVISED, "");
         addUtc("UPS15", "DEL", "CGN", "2026-08-09T08:10", "2026-08-09T17:06", null, null, "F/O", "Crew Access", "Cologne Marriott Hotel", FlightLeg.ChangeType.ORIGINAL, "");
-        addUtc("UPS224", "CGN", "SDF", "2026-08-10T17:25", "2026-08-11T02:17", null, null, "R/O", "Crew Access", "Galt House", FlightLeg.ChangeType.ORIGINAL, "");
-        addUtc("UPS5074", "SDF", "ANC", "2026-08-11T19:50", "2026-08-12T02:44", null, null, "DH", "Crew Access", null, FlightLeg.ChangeType.ORIGINAL, "");
+
+        // Company revision received after this trip had already started.
+        // Old roster: R/O UPS224 CGN-SDF, then DH UPS5074 SDF-ANC.
+        // New roster: F/O UPS008 CGN-SZX, then F/O UPS071 SZX-ANC.
+        addUtc("UPS008", "CGN", "SZX", "2026-08-11T05:27", "2026-08-11T17:10", "2026-08-10T17:25", "2026-08-11T02:17", "F/O", "Unacknowledged Roster Changes", "JW Marriott Shenzhen", FlightLeg.ChangeType.REVISED, "");
+        addUtc("UPS071", "SZX", "ANC", "2026-08-12T21:05", "2026-08-13T07:08", "2026-08-11T19:50", "2026-08-12T02:44", "F/O", "Unacknowledged Roster Changes", null, FlightLeg.ChangeType.REVISED, "");
 
         // A70327R was picked up in the approved Aug 7 trade. Crew Access screenshot supplies current leg details.
         addUtc("UPS71", "ANC", "SDF", "2026-08-20T17:13", "2026-08-20T23:20", null, null, "F/O", "Trade confirmation + Crew Access", "Galt House", FlightLeg.ChangeType.TRADED, "A70327R");

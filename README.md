@@ -1,23 +1,31 @@
 # Pilot Companion
 
-Pilot Companion is an Android month-view planner for flight schedules. It shows local departure/arrival times, true elapsed block time, seat position, hotels, countdowns, and month navigation.
+Pilot Companion is an Android planner for UPS flight schedules. It shows local and Zulu times, elapsed block time, seat position, hotels, countdowns, traded/revised state, pay-period grouping, and a shared schedule feed.
 
-Version 0.2 loaded the August-September 2026 schedule from supplied Flight Ops and Crew Access screenshots. Version 0.3 restored the operational leg card.
+## Milestone 2 / Version 0.6
 
-## Milestone 2 / Version 0.4
+- **Blue = TRADED** for pilot-initiated trades made before the trip starts.
+- **Yellow = REVISED** for company revisions.
+- Once a trip has started, any later schedule change is classified as **REVISED**.
+- Current A70327R schedule is loaded: ANC-SDF-CGN-SZX-ANC, with FO/FO/RO/RO positions.
+- Tapping a flight opens a detailed flight card with local departure/arrival, Zulu departure/arrival, block time, position, status, pairing, hotel, and source.
+- The app opens on the current date when scheduled, otherwise the nearest scheduled date, and highlights it.
+- **Upload schedule** accepts Crew Access screenshots (on-device OCR), text, and JSON/text files. Imported schedules persist on that device without rebuilding the APK.
+- **Sync now** downloads `shared_schedule.txt` from this repository. Every installed copy of the app reads the same public shared feed, so schedule changes published there appear on all devices without a new APK.
+- Calendar navigation is grouped into 28-day pay-period windows. The current 2026 anchor is configurable in `PayPeriodCalculator`.
 
-- Schedule changes are explicit data states instead of being inferred only from time differences.
-- **Blue = TRADED**: pilot-initiated trades made before the trip starts.
-- **Yellow = REVISED**: company-initiated revisions.
-- **Post-start rule:** once a trip has started, any later change to that trip is classified as **REVISED** and displayed yellow.
-- The approved Aug 7 trade replaces A70746 with **A70327R** and loads the current Crew Access legs ANC-SDF-CGN-SZX-ANC.
-- A70327R is marked TRADED throughout the month and detail views until a post-start change occurs; a post-start change is REVISED.
-- Pairing number is displayed with traded legs.
-- The data model is prepared for a shared schedule source so a spouse/family installation can read the same roster.
+### Important sync distinction
 
-### Shared schedule architecture
+Version 0.6 has two schedule paths:
 
-The next sync step is a single cloud schedule document/account shared by the pilot and invited family viewers. The pilot installation will be the owner/editor; family installations will be read-only. Do not store UPS credentials in the app or share them with family devices. Until a cloud provider/project is configured, version 0.4 continues to use the bundled schedule as its offline source.
+1. **In-app import:** owner can import a screenshot/file and use it immediately on that device; the import is stored locally.
+2. **Shared-device sync:** all devices pull the public `shared_schedule.txt` feed. Updating that feed updates every installed device after sync/startup without rebuilding the app.
+
+A future backend/OAuth step will allow an owner-device import to publish directly to the shared feed. No GitHub token or UPS credential is embedded in the APK.
+
+### Pay-period source rule
+
+The UPS/IPA Agreement provides a 75:00 guarantee for a normal 28-day pay period and a 96:00 guarantee for a 35-day pay period. Version 0.6 therefore models 28-day periods but keeps the anchor configurable so an official payroll/bid calendar can replace the provisional 2026 anchor.
 
 ### Schedule source rules
 
@@ -26,7 +34,7 @@ The next sync step is a single cloud schedule document/account shared by the pil
 - Trade confirmations identify pilot-initiated TRADED pairings before trip start.
 - Once the trip has started, any detected schedule change is REVISED.
 - Company changes before trip start are also REVISED.
-- Source timestamps are converted to local time at each endpoint using the airport time zone.
+- Crew Access times are interpreted as Zulu and converted to local time at each airport.
 - Position labels follow: `DH`, `FO2`, and `IRO`/`RO`; all other labels display as `FO`.
 
 ## Install the latest debug APK
@@ -35,15 +43,15 @@ The next sync step is a single cloud schedule document/account shared by the pil
 2. Open the newest successful **Android debug APK** run.
 3. In **Artifacts**, download **pilot-companion-debug**.
 4. Unzip it and copy `app-debug.apk` to the Android phone.
-5. Open the APK. If Android asks, allow **Install unknown apps**, then choose **Install**.
+5. Open the APK and install it over the existing Pilot Companion app.
 
 ## Build locally
 
 Use Android SDK 36 and Java 17, then run `./gradlew testDebugUnitTest assembleDebug` (Windows: `./gradlew.bat testDebugUnitTest assembleDebug`).
 
-## Roadmap
+## Next
 
-- Connect shared cloud schedule and family read-only access
-- Import Crew Access screenshots and parse trips automatically
-- Add pay/pay-period tracking
-- Add weather, hotel/airport maps, notifications, and logbook integration
+- Owner-authenticated publishing so a schedule imported on one phone automatically writes to the shared feed
+- More robust Crew Access OCR layouts and PDF parsing
+- Pay/credit tracking by pay period
+- Weather, hotel/airport maps, notifications, and logbook integration

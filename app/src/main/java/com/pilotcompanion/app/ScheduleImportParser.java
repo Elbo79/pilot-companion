@@ -31,13 +31,36 @@ final class ScheduleImportParser {
             String assignment = m.group(10).toUpperCase(Locale.US);
             ZonedDateTime departureUtc = ZonedDateTime.parse(String.format(Locale.US, "2026-%02d-%02dT%sZ", depMonth, depDay, m.group(3)));
             ZonedDateTime arrivalUtc = ZonedDateTime.parse(String.format(Locale.US, "2026-%02d-%02dT%sZ", arrMonth, arrDay, m.group(6)));
-            ZonedDateTime departure = departureUtc.withZoneSameInstant(zone(origin));
-            ZonedDateTime arrival = arrivalUtc.withZoneSameInstant(zone(destination));
-            FlightLeg.ChangeType type = requestedType;
-            result.add(new FlightLeg(flight, origin, destination, departure, arrival, departure, arrival,
-                    assignment, "Imported in app", null, type, pairing == null ? "" : pairing));
+            result.add(make(flight, origin, destination, departureUtc, arrivalUtc, assignment, requestedType, pairing, null, "Imported in app"));
         }
         return result;
+    }
+
+    static List<FlightLeg> parseSharedFormat(String text) {
+        List<FlightLeg> result = new ArrayList<>();
+        for (String raw : text.split("\\R")) {
+            String line = raw.trim();
+            if (line.isEmpty() || line.startsWith("#")) continue;
+            String[] p = line.split("\\|", -1);
+            if (p.length < 9) continue;
+            try {
+                ZonedDateTime departureUtc = ZonedDateTime.parse(p[0].trim());
+                ZonedDateTime arrivalUtc = ZonedDateTime.parse(p[1].trim());
+                FlightLeg.ChangeType type = FlightLeg.ChangeType.valueOf(p[6].trim().toUpperCase(Locale.US));
+                result.add(make(p[2].trim(), p[3].trim(), p[4].trim(), departureUtc, arrivalUtc,
+                        p[5].trim(), type, p[7].trim(), p[8].trim().isEmpty() ? null : p[8].trim(), "Shared schedule sync"));
+            } catch (RuntimeException ignored) { }
+        }
+        return result;
+    }
+
+    private static FlightLeg make(String flight, String origin, String destination, ZonedDateTime departureUtc,
+                                  ZonedDateTime arrivalUtc, String assignment, FlightLeg.ChangeType type,
+                                  String pairing, String hotel, String source) {
+        ZonedDateTime departure = departureUtc.withZoneSameInstant(zone(origin));
+        ZonedDateTime arrival = arrivalUtc.withZoneSameInstant(zone(destination));
+        return new FlightLeg(flight, origin, destination, departure, arrival, departure, arrival,
+                assignment, source, hotel, type, pairing == null ? "" : pairing);
     }
 
     private static int month(String shortName) {

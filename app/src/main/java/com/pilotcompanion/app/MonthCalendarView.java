@@ -19,8 +19,9 @@ final class MonthCalendarView extends View {
     private YearMonth month = YearMonth.now();
     private LocalDate selected;
     private Consumer<LocalDate> listener = ignored -> { };
-    MonthCalendarView(Context context, ScheduleRepository repository) { super(context); this.repository = repository; selected = repository.firstScheduledDate(); paint.setTypeface(android.graphics.Typeface.create("sans", android.graphics.Typeface.NORMAL)); }
+    MonthCalendarView(Context context, ScheduleRepository repository) { super(context); this.repository = repository; selected = repository.nearestScheduledDate(LocalDate.now()); paint.setTypeface(android.graphics.Typeface.create("sans", android.graphics.Typeface.NORMAL)); }
     void setMonth(YearMonth month) { this.month = month; invalidate(); }
+    void setSelectedDate(LocalDate date) { this.selected = date; invalidate(); }
     void setOnDateSelectedListener(Consumer<LocalDate> listener) { this.listener = listener; }
 
     @Override protected void onDraw(Canvas canvas) {

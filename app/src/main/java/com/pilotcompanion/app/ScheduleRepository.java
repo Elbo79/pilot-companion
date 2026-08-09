@@ -3,6 +3,7 @@ package com.pilotcompanion.app;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -19,13 +20,9 @@ final class ScheduleRepository {
         addUtc("UPS6011", "ICN", "DEL", "2026-08-08T01:19", "2026-08-08T08:46", null, null, "F/O", "Crew Access", "Andaz Delhi", FlightLeg.ChangeType.REVISED, "");
         addUtc("UPS15", "DEL", "CGN", "2026-08-09T08:10", "2026-08-09T17:06", null, null, "F/O", "Crew Access", "Cologne Marriott Hotel", FlightLeg.ChangeType.ORIGINAL, "");
 
-        // Company revision received after this trip had already started.
-        // Old roster: R/O UPS224 CGN-SDF, then DH UPS5074 SDF-ANC.
-        // New roster: F/O UPS008 CGN-SZX, then F/O UPS071 SZX-ANC.
         addUtc("UPS008", "CGN", "SZX", "2026-08-11T05:27", "2026-08-11T17:10", "2026-08-10T17:25", "2026-08-11T02:17", "F/O", "Unacknowledged Roster Changes", "JW Marriott Shenzhen", FlightLeg.ChangeType.REVISED, "");
         addUtc("UPS071", "SZX", "ANC", "2026-08-12T21:05", "2026-08-13T07:08", "2026-08-11T19:50", "2026-08-12T02:44", "F/O", "Unacknowledged Roster Changes", null, FlightLeg.ChangeType.REVISED, "");
 
-        // A70327R was picked up in the approved Aug 7 trade. Crew Access screenshot supplies current leg details.
         addUtc("UPS71", "ANC", "SDF", "2026-08-20T17:13", "2026-08-20T23:20", null, null, "F/O", "Trade confirmation + Crew Access", "Galt House", FlightLeg.ChangeType.TRADED, "A70327R");
         addUtc("UPS213", "SDF", "CGN", "2026-08-21T12:42", "2026-08-21T20:40", null, null, "F/O", "Trade confirmation + Crew Access", "Cologne Marriott Hotel", FlightLeg.ChangeType.TRADED, "A70327R");
         addUtc("UPS14", "CGN", "SZX", "2026-08-25T03:47", "2026-08-25T15:30", null, null, "R/O", "Trade confirmation + Crew Access", "JW Marriott Shenzhen", FlightLeg.ChangeType.TRADED, "A70327R");
@@ -35,6 +32,16 @@ final class ScheduleRepository {
         addUtc("UPS36", "SDF", "HNL", "2026-09-05T11:26", "2026-09-05T20:31", null, null, "F/O", "Crew Access", "Ala Moana Honolulu by Mantra", FlightLeg.ChangeType.ORIGINAL, "");
         addUtc("UPS35", "HNL", "ICN", "2026-09-07T06:45", "2026-09-07T16:20", null, null, "DH", "Crew Access revision", "Sheraton Incheon", FlightLeg.ChangeType.REVISED, "");
         addUtc("UPS99", "ICN", "ANC", "2026-09-08T12:50", "2026-09-08T20:51", null, null, "F/O", "Crew Access revision", null, FlightLeg.ChangeType.REVISED, "");
+    }
+
+    void mergeImported(List<FlightLeg> imported) {
+        for (FlightLeg leg : imported) {
+            for (List<FlightLeg> existing : schedule.values()) {
+                existing.removeIf(old -> (!leg.pairing().isBlank() && leg.pairing().equals(old.pairing()) && leg.flightNumber().equals(old.flightNumber()))
+                        || (leg.flightNumber().equals(old.flightNumber()) && leg.origin().equals(old.origin()) && leg.destination().equals(old.destination())));
+            }
+            schedule.computeIfAbsent(leg.departure().toLocalDate(), ignored -> new ArrayList<>()).add(leg);
+        }
     }
 
     private void addUtc(String number, String from, String to, String actualOut, String actualIn,
@@ -51,17 +58,17 @@ final class ScheduleRepository {
 
     List<FlightLeg> forDate(LocalDate date) { return Collections.unmodifiableList(schedule.getOrDefault(date, List.of())); }
     LocalDate firstScheduledDate() { return schedule.keySet().stream().min(LocalDate::compareTo).orElse(LocalDate.now()); }
+    LocalDate nearestScheduledDate(LocalDate target) {
+        if (schedule.containsKey(target)) return target;
+        return schedule.keySet().stream().min((a,b) -> Long.compare(Math.abs(ChronoUnit.DAYS.between(target,a)), Math.abs(ChronoUnit.DAYS.between(target,b)))).orElse(target);
+    }
 
     private static ZoneId airportZone(String airport) {
         return switch (airport) {
-            case "ANC" -> ZoneId.of("America/Anchorage");
-            case "SDF" -> ZoneId.of("America/Kentucky/Louisville");
-            case "HNL" -> ZoneId.of("Pacific/Honolulu");
-            case "HKG" -> ZoneId.of("Asia/Hong_Kong");
-            case "ICN" -> ZoneId.of("Asia/Seoul");
-            case "SZX" -> ZoneId.of("Asia/Shanghai");
-            case "DEL" -> ZoneId.of("Asia/Kolkata");
-            case "CGN" -> ZoneId.of("Europe/Berlin");
+            case "ANC" -> ZoneId.of("America/Anchorage"); case "SDF" -> ZoneId.of("America/Kentucky/Louisville");
+            case "HNL" -> ZoneId.of("Pacific/Honolulu"); case "HKG" -> ZoneId.of("Asia/Hong_Kong");
+            case "ICN" -> ZoneId.of("Asia/Seoul"); case "SZX" -> ZoneId.of("Asia/Shanghai");
+            case "DEL" -> ZoneId.of("Asia/Kolkata"); case "CGN" -> ZoneId.of("Europe/Berlin");
             default -> UTC;
         };
     }

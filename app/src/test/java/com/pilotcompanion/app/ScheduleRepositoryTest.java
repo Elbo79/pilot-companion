@@ -42,6 +42,15 @@ public class ScheduleRepositoryTest {
         assertEquals("6h 07m",leg.flightTime());
     }
 
+    @Test public void a70327rSdfCgnUsesCrewAccessZuluAndCorrectLouisvilleLocalTime(){
+        FlightLeg leg=repository.forDate(LocalDate.of(2026,8,21)).get(0);
+        assertEquals("UPS213",leg.flightNumber());
+        assertEquals("04:42-18:40",leg.localTimes());
+        assertEquals("Aug 21 08:42Z",leg.departureZulu());
+        assertEquals("Aug 21 16:40Z",leg.arrivalZulu());
+        assertEquals("7h 58m",leg.flightTime());
+    }
+
     @Test public void tradedRestSeatMapsToRo(){
         assertEquals("RO",repository.forDate(LocalDate.of(2026,8,25)).get(0).seatPosition());
     }

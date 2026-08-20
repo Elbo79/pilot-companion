@@ -4,8 +4,8 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
 final class PayPeriodCalculator {
-    // Configurable 2026 anchor. Contract default is 28-day pay periods; 35-day periods can be supplied later.
-    private static final LocalDate ANCHOR = LocalDate.of(2026, 8, 2);
+    // UPS 2026 Dates to Remember: PP1 begins Dec 28, 2025; each published pay period is 28 days.
+    private static final LocalDate ANCHOR = LocalDate.of(2025, 12, 28);
     private static final int DAYS = 28;
 
     record Period(LocalDate start, LocalDate end, int index) { }

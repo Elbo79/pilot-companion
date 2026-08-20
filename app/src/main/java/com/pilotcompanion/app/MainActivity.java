@@ -108,7 +108,10 @@ public final class MainActivity extends Activity {
     }
 
     private void showMonth() {
-        monthTitle.setText("PP" + currentPeriod.index());
+        String startMonth = currentPeriod.start().format(DateTimeFormatter.ofPattern("MMMM", Locale.US));
+        String endMonth = currentPeriod.end().format(DateTimeFormatter.ofPattern("MMMM", Locale.US));
+        String monthSpan = startMonth.equals(endMonth) ? startMonth : startMonth + "–" + endMonth;
+        monthTitle.setText(monthSpan + " • PP" + currentPeriod.index());
         payPeriodTitle.setText("UPS Pay Period • " + currentPeriod.start().format(DateTimeFormatter.ofPattern("MMM d")) + " – " + currentPeriod.end().format(DateTimeFormatter.ofPattern("MMM d, yyyy")));
         calendar.setMonth(YearMonth.from(currentPeriod.end()));
     }

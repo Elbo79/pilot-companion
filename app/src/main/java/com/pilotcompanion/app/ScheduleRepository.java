@@ -23,9 +23,9 @@ final class ScheduleRepository {
         addUtc("UPS008", "CGN", "SZX", "2026-08-11T05:27", "2026-08-11T17:10", "2026-08-10T17:25", "2026-08-11T02:17", "F/O", "Unacknowledged Roster Changes", "JW Marriott Shenzhen", FlightLeg.ChangeType.REVISED, "");
         addUtc("UPS071", "SZX", "ANC", "2026-08-12T21:05", "2026-08-13T07:08", "2026-08-11T19:50", "2026-08-12T02:44", "F/O", "Unacknowledged Roster Changes", null, FlightLeg.ChangeType.REVISED, "");
 
-        // Crew Access trip A70327R is published in Zulu. UPS71 departs 09:13Z, which is 01:13 local in ANC on Aug 20.
+        // Crew Access trip A70327R is published in Zulu. Store Zulu as authoritative and derive local time by airport.
         addUtc("UPS71", "ANC", "SDF", "2026-08-20T09:13", "2026-08-20T15:20", null, null, "F/O", "Trade confirmation + Crew Access", "Galt House", FlightLeg.ChangeType.TRADED, "A70327R");
-        addUtc("UPS213", "SDF", "CGN", "2026-08-21T12:42", "2026-08-21T20:40", null, null, "F/O", "Trade confirmation + Crew Access", "Cologne Marriott Hotel", FlightLeg.ChangeType.TRADED, "A70327R");
+        addUtc("UPS213", "SDF", "CGN", "2026-08-21T08:42", "2026-08-21T16:40", null, null, "F/O", "Trade confirmation + Crew Access", "Cologne Marriott Hotel", FlightLeg.ChangeType.TRADED, "A70327R");
         addUtc("UPS14", "CGN", "SZX", "2026-08-25T03:47", "2026-08-25T15:30", null, null, "R/O", "Trade confirmation + Crew Access", "JW Marriott Shenzhen", FlightLeg.ChangeType.TRADED, "A70327R");
         addUtc("UPS77", "SZX", "ANC", "2026-08-26T11:10", "2026-08-26T21:13", null, null, "R/O", "Trade confirmation + Crew Access", null, FlightLeg.ChangeType.TRADED, "A70327R");
 

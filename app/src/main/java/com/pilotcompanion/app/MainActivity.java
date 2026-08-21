@@ -74,7 +74,6 @@ public final class MainActivity extends Activity {
 
     private View buildScreen() {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-        // Narrower side padding gives each of the seven calendar columns more usable room.
         root.setPadding(dp(6), dp(8), dp(6), dp(8)); root.setBackgroundColor(0xFF071B2F);
         TextView appName = label("PILOT COMPANION", 13, 0xFF68D8FF); appName.setLetterSpacing(.18f); root.addView(appName);
         root.addView(label("Blue = traded   Yellow = company revised", 11, 0xFFB8C7D9));
@@ -102,7 +101,6 @@ public final class MainActivity extends Activity {
 
         detailPanel = new LinearLayout(this); detailPanel.setOrientation(LinearLayout.VERTICAL);
         detailPanel.setPadding(dp(10), dp(6), dp(10), dp(6)); detailPanel.setBackgroundColor(0xFF102A43);
-        // Slightly smaller detail panel gives the four calendar rows more vertical room.
         root.addView(detailPanel, new LinearLayout.LayoutParams(-1, dp(205)));
 
         previous.setOnClickListener(v -> {
@@ -138,8 +136,10 @@ public final class MainActivity extends Activity {
         calendar.setSelectedDate(date);
         detailPanel.removeAllViews();
         detailPanel.addView(label(date.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)), 17, 0xFFFFFFFF));
+
         var legs = repository.forDate(date);
-        if (legs.isEmpty()) { detailPanel.addView(label("No flying scheduled", 14, 0xFF9FB3C8)); return; }
+        List<ImportantDate> events = importantDates.forDate(date);
+
         for (FlightLeg leg : legs) {
             int stateColor = leg.isRevised() ? 0xFFFFC857 : leg.isTraded() ? 0xFF4DA3FF : 0xFF68D8FF;
             String pairing = leg.pairing().isBlank() ? "" : "  " + leg.pairing();
@@ -158,6 +158,45 @@ public final class MainActivity extends Activity {
             detailPanel.addView(label("California " + leg.californiaTimes(), 12, 0xFF9AD5FF));
             if (leg.hotel() != null) detailPanel.addView(label("Hotel: " + leg.hotel(), 12, 0xFFB8E986));
         }
+
+        if (!events.isEmpty()) {
+            if (!legs.isEmpty()) detailPanel.addView(label("IMPORTANT DATES", 11, 0xFFFFD166));
+            for (ImportantDate event : events) {
+                int eventColor = switch (event.type()) {
+                    case VACATION -> 0xFFFFD166;
+                    case BID -> 0xFF9AD5FF;
+                    case PAY_PERIOD -> 0xFFB8E986;
+                    case PAYDAY -> 0xFFC9A7FF;
+                    case REMINDER -> 0xFFFF9F80;
+                };
+                detailPanel.addView(label(event.calendarLabel(), 12, eventColor));
+            }
+        }
+
+        if (legs.isEmpty() && events.isEmpty()) {
+            showNextAssignmentCountdown();
+        }
+    }
+
+    private void showNextAssignmentCountdown() {
+        FlightLeg next = repository.nextAssignmentAfter(Instant.now());
+        if (next == null) {
+            detailPanel.addView(label("No flying or deadhead assignment currently loaded after this date.", 13, 0xFF9FB3C8));
+            return;
+        }
+
+        String assignment = next.seatPosition().equals("DH") ? "NEXT DEADHEAD" : "NEXT FLIGHT ASSIGNMENT";
+        Duration until = Duration.between(Instant.now(), next.departure().toInstant());
+        TextView countdown = label(assignment + " IN  " + compactDuration(until), 15, 0xFFFFC857);
+        countdown.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        detailPanel.addView(countdown);
+        detailPanel.addView(label(next.flightNumber() + "  " + next.origin() + " > " + next.destination() + "   " + next.seatPosition(), 14, 0xFF68D8FF));
+
+        TextView local = label("LOCAL  " + next.departure().format(DateTimeFormatter.ofPattern("EEE MMM d HH:mm z", Locale.US)), 13, 0xFFFFFFFF);
+        local.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        detailPanel.addView(local);
+        detailPanel.addView(label("Zulu " + next.departureZulu(), 12, 0xFFB8C7D9));
+        detailPanel.addView(label("California " + next.departureCalifornia(), 12, 0xFF9AD5FF));
     }
 
     private void showFlightDetails(FlightLeg leg) {
@@ -232,7 +271,7 @@ public final class MainActivity extends Activity {
     private String detectPairing(String text) { Matcher m = Pattern.compile("\\bA\\d{5,6}R?\\b", Pattern.CASE_INSENSITIVE).matcher(text); return m.find() ? m.group().toUpperCase(Locale.US) : ""; }
     private String readText(Uri uri) throws Exception { StringBuilder out = new StringBuilder(); try (InputStream in = getContentResolver().openInputStream(uri); BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) { String line; while ((line = reader.readLine()) != null) out.append(line).append('\n'); } return out.toString(); }
     private String departureStatus(FlightLeg leg) { Instant now = Instant.now(); if (now.isBefore(leg.departure().toInstant())) return "Departs in " + compactDuration(Duration.between(now, leg.departure().toInstant())); if (now.isBefore(leg.arrival().toInstant())) return "In progress - arrives in " + compactDuration(Duration.between(now, leg.arrival().toInstant())); return "Departed " + compactDuration(Duration.between(leg.departure().toInstant(), now)) + " ago"; }
-    private String compactDuration(Duration duration) { long days = duration.toDays(), hours = duration.minusDays(days).toHours(), minutes = duration.minusDays(days).minusHours(hours).toMinutes(); return days > 0 ? days + "d " + hours + "h " + minutes + "m" : hours + "h " + minutes + "m"; }
+    private String compactDuration(Duration duration) { long days = duration.toDays(); long hours = duration.minusDays(days).toHours(); long minutes = duration.minusDays(days).minusHours(hours).toMinutes(); return days > 0 ? days + "d " + hours + "h " + minutes + "m" : hours + "h " + minutes + "m"; }
     private TextView label(String text, int sp, int color) { TextView view = new TextView(this); view.setText(text); view.setTextSize(sp); view.setTextColor(color); view.setGravity(Gravity.CENTER_VERTICAL); return view; }
     private Button button(String text) { Button button = new Button(this); button.setText(text); button.setTextSize(24); button.setTextColor(0xFFFFFFFF); button.setBackgroundColor(0x00000000); return button; }
     private Button smallButton(String text) { Button button = new Button(this); button.setText(text); button.setTextSize(12); return button; }

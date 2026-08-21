@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -61,7 +62,8 @@ public final class MainActivity extends Activity {
         currentPeriod = PayPeriodCalculator.containing(selectedDate);
         visibleMonth = YearMonth.from(currentPeriod.end());
         setContentView(buildScreen());
-        showMonth(); showDay(selectedDate);
+        showMonth();
+        showDay(selectedDate);
         requestNotificationPermission();
         ReminderScheduler.scheduleAll(this, importantDates);
         syncFromCloud();
@@ -72,7 +74,8 @@ public final class MainActivity extends Activity {
 
     private View buildScreen() {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(12), dp(16), dp(12)); root.setBackgroundColor(0xFF071B2F);
+        // Narrower side padding gives each of the seven calendar columns more usable room.
+        root.setPadding(dp(6), dp(8), dp(6), dp(8)); root.setBackgroundColor(0xFF071B2F);
         TextView appName = label("PILOT COMPANION", 13, 0xFF68D8FF); appName.setLetterSpacing(.18f); root.addView(appName);
         root.addView(label("Blue = traded   Yellow = company revised", 11, 0xFFB8C7D9));
         root.addView(label("ANC FO dates: bids • vacation • pay periods • paydays • reminders", 10, 0xFFFFD166));
@@ -80,24 +83,38 @@ public final class MainActivity extends Activity {
         LinearLayout actions = new LinearLayout(this); actions.setGravity(Gravity.CENTER_VERTICAL);
         Button upload = smallButton("Upload schedule"); Button sync = smallButton("Sync now");
         syncStatus = label("Shared schedule: connecting…", 10, 0xFFB8C7D9);
-        actions.addView(upload, new LinearLayout.LayoutParams(0, dp(44), 1));
-        actions.addView(sync, new LinearLayout.LayoutParams(0, dp(44), 1)); root.addView(actions); root.addView(syncStatus);
+        actions.addView(upload, new LinearLayout.LayoutParams(0, dp(40), 1));
+        actions.addView(sync, new LinearLayout.LayoutParams(0, dp(40), 1)); root.addView(actions); root.addView(syncStatus);
         upload.setOnClickListener(v -> openSchedulePicker()); sync.setOnClickListener(v -> syncFromCloud());
 
         LinearLayout controls = new LinearLayout(this); controls.setGravity(Gravity.CENTER_VERTICAL);
-        Button previous = button("<"); monthTitle = label("", 23, 0xFFFFFFFF); monthTitle.setGravity(Gravity.CENTER); Button next = button(">");
-        controls.addView(previous, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        controls.addView(monthTitle, new LinearLayout.LayoutParams(0, dp(52), 1));
-        controls.addView(next, new LinearLayout.LayoutParams(dp(48), dp(48))); root.addView(controls);
+        Button previous = button("<"); monthTitle = label("", 22, 0xFFB9DFFF); monthTitle.setGravity(Gravity.CENTER); Button next = button(">");
+        controls.addView(previous, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        controls.addView(monthTitle, new LinearLayout.LayoutParams(0, dp(46), 1));
+        controls.addView(next, new LinearLayout.LayoutParams(dp(44), dp(44))); root.addView(controls);
         payPeriodTitle = label("", 12, 0xFFFFD166); payPeriodTitle.setGravity(Gravity.CENTER); root.addView(payPeriodTitle);
 
-        calendar = new MonthCalendarView(this, repository, importantDates); calendar.setSelectedDate(selectedDate); calendar.setOnDateSelectedListener(this::showDay);
+        calendar = new MonthCalendarView(this, repository, importantDates);
+        calendar.setPeriod(currentPeriod);
+        calendar.setSelectedDate(selectedDate);
+        calendar.setOnDateSelectedListener(this::showDay);
         root.addView(calendar, new LinearLayout.LayoutParams(-1, 0, 1));
+
         detailPanel = new LinearLayout(this); detailPanel.setOrientation(LinearLayout.VERTICAL);
-        detailPanel.setPadding(dp(14), dp(8), dp(14), dp(8)); detailPanel.setBackgroundColor(0xFF102A43);
-        root.addView(detailPanel, new LinearLayout.LayoutParams(-1, dp(230)));
-        previous.setOnClickListener(v -> { currentPeriod = PayPeriodCalculator.shift(currentPeriod, -1); visibleMonth = YearMonth.from(currentPeriod.end()); showMonth(); });
-        next.setOnClickListener(v -> { currentPeriod = PayPeriodCalculator.shift(currentPeriod, 1); visibleMonth = YearMonth.from(currentPeriod.end()); showMonth(); });
+        detailPanel.setPadding(dp(10), dp(6), dp(10), dp(6)); detailPanel.setBackgroundColor(0xFF102A43);
+        // Slightly smaller detail panel gives the four calendar rows more vertical room.
+        root.addView(detailPanel, new LinearLayout.LayoutParams(-1, dp(205)));
+
+        previous.setOnClickListener(v -> {
+            currentPeriod = PayPeriodCalculator.shift(currentPeriod, -1);
+            visibleMonth = YearMonth.from(currentPeriod.end());
+            showMonth();
+        });
+        next.setOnClickListener(v -> {
+            currentPeriod = PayPeriodCalculator.shift(currentPeriod, 1);
+            visibleMonth = YearMonth.from(currentPeriod.end());
+            showMonth();
+        });
         return root;
     }
 
@@ -113,22 +130,30 @@ public final class MainActivity extends Activity {
         String monthSpan = startMonth.equals(endMonth) ? startMonth : startMonth + "–" + endMonth;
         monthTitle.setText(monthSpan + " • PP" + currentPeriod.index());
         payPeriodTitle.setText("UPS Pay Period • " + currentPeriod.start().format(DateTimeFormatter.ofPattern("MMM d")) + " – " + currentPeriod.end().format(DateTimeFormatter.ofPattern("MMM d, yyyy")));
-        calendar.setMonth(YearMonth.from(currentPeriod.end()));
+        calendar.setPeriod(currentPeriod);
     }
 
     private void showDay(LocalDate date) {
-        selectedDate = date; calendar.setSelectedDate(date);
-        detailPanel.removeAllViews(); detailPanel.addView(label(date.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)), 17, 0xFFFFFFFF));
+        selectedDate = date;
+        calendar.setSelectedDate(date);
+        detailPanel.removeAllViews();
+        detailPanel.addView(label(date.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)), 17, 0xFFFFFFFF));
         var legs = repository.forDate(date);
         if (legs.isEmpty()) { detailPanel.addView(label("No flying scheduled", 14, 0xFF9FB3C8)); return; }
         for (FlightLeg leg : legs) {
             int stateColor = leg.isRevised() ? 0xFFFFC857 : leg.isTraded() ? 0xFF4DA3FF : 0xFF68D8FF;
             String pairing = leg.pairing().isBlank() ? "" : "  " + leg.pairing();
             TextView flightRow = label(leg.flightNumber() + "  " + leg.origin() + " > " + leg.destination() + "   " + leg.seatPosition() + pairing + "  ›", 16, stateColor);
-            flightRow.setPadding(0, dp(5), 0, dp(5)); flightRow.setOnClickListener(v -> showFlightDetails(leg)); detailPanel.addView(flightRow);
+            flightRow.setPadding(0, dp(4), 0, dp(4));
+            flightRow.setOnClickListener(v -> showFlightDetails(leg));
+            detailPanel.addView(flightRow);
             detailPanel.addView(label(leg.changeLabel() + "  •  tap flight for details", 11, stateColor));
             detailPanel.addView(label(departureStatus(leg), 13, 0xFFE8F1F8));
-            detailPanel.addView(label("Local " + leg.localTimes() + "  |  Block " + leg.flightTime() + "  |  Seat " + leg.seatPosition(), 12, 0xFFFFFFFF));
+
+            TextView localRow = label("LOCAL  " + leg.localTimes() + "  |  Block " + leg.flightTime() + "  |  Seat " + leg.seatPosition(), 13, 0xFFFFFFFF);
+            localRow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            detailPanel.addView(localRow);
+
             detailPanel.addView(label("Zulu " + leg.zuluTimes(), 12, 0xFFB8C7D9));
             detailPanel.addView(label("California " + leg.californiaTimes(), 12, 0xFF9AD5FF));
             if (leg.hotel() != null) detailPanel.addView(label("Hotel: " + leg.hotel(), 12, 0xFFB8E986));
@@ -180,7 +205,9 @@ public final class MainActivity extends Activity {
         if (requestedType == FlightLeg.ChangeType.TRADED && Instant.now().isAfter(firstDeparture)) { effective = FlightLeg.ChangeType.REVISED; legs = ScheduleImportParser.parseCrewAccessText(text, effective, pairing); }
         repository.mergeImported(legs);
         if (persist) getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("import_text", text).putString("import_type", effective.name()).putString("import_pairing", pairing).apply();
-        selectedDate = LocalDate.now(); currentPeriod = PayPeriodCalculator.containing(selectedDate); visibleMonth = YearMonth.from(currentPeriod.end());
+        selectedDate = LocalDate.now();
+        currentPeriod = PayPeriodCalculator.containing(selectedDate);
+        visibleMonth = YearMonth.from(currentPeriod.end());
         showMonth(); showDay(selectedDate); Toast.makeText(this, "Schedule imported: " + legs.size() + " flights", Toast.LENGTH_SHORT).show();
     }
 

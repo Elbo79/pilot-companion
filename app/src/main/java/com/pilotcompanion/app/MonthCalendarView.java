@@ -65,27 +65,30 @@ final class MonthCalendarView extends View {
             int column = index % 7;
             float left = column * cellWidth;
             float top = header + row * cellHeight;
+            float right = left + cellWidth;
+            float bottom = top + cellHeight;
             LocalDate date = period.start().plusDays(index);
 
-            // Alternate subtle blue hues when a pay period crosses into another month.
             paint.setStyle(Paint.Style.FILL);
             paint.setColor((date.getMonthValue() % 2 == 0) ? 0xFF0C2942 : 0xFF102F4B);
-            canvas.drawRect(left + dp(1), top + dp(1), left + cellWidth - dp(1), top + cellHeight - dp(1), paint);
+            canvas.drawRect(left + dp(1), top + dp(1), right - dp(1), bottom - dp(1), paint);
 
             if (date.equals(LocalDate.now())) {
                 paint.setColor(0xFF1F5A78);
-                canvas.drawRoundRect(left + dp(2), top + dp(2), left + cellWidth - dp(2),
-                        top + cellHeight - dp(2), dp(9), dp(9), paint);
+                canvas.drawRoundRect(left + dp(2), top + dp(2), right - dp(2), bottom - dp(2), dp(9), dp(9), paint);
             } else if (date.equals(selected)) {
                 paint.setColor(0xFF173B56);
-                canvas.drawRoundRect(left + dp(2), top + dp(2), left + cellWidth - dp(2),
-                        top + cellHeight - dp(2), dp(9), dp(9), paint);
+                canvas.drawRoundRect(left + dp(2), top + dp(2), right - dp(2), bottom - dp(2), dp(9), dp(9), paint);
             }
 
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(dp(1));
             paint.setColor(0xFF365A78);
-            canvas.drawRect(left, top, left + cellWidth, top + cellHeight, paint);
+            canvas.drawRect(left, top, right, bottom, paint);
+
+            // Hard-clip all date/schedule/event text to this cell so nothing can bleed into a neighboring day.
+            int save = canvas.save();
+            canvas.clipRect(left + dp(2), top + dp(2), right - dp(2), bottom - dp(2));
 
             paint.setStyle(Paint.Style.FILL);
             paint.setTextAlign(Paint.Align.LEFT);
@@ -108,7 +111,6 @@ final class MonthCalendarView extends View {
                 paint.setColor(stateColor);
                 canvas.drawText(leg.origin() + ">" + leg.destination(), left + dp(4), y, paint); y += dp(11);
 
-                // Local time is the primary operational time, so make it bold.
                 paint.setTypeface(Typeface.create("sans", Typeface.BOLD));
                 paint.setColor(Color.WHITE);
                 canvas.drawText(leg.localTimes(), left + dp(4), y, paint); y += dp(11);
@@ -131,6 +133,8 @@ final class MonthCalendarView extends View {
                 paint.setColor(0xFFB8C7D9);
                 canvas.drawText("+" + (events.size() - 2) + " dates", left + dp(4), y, paint);
             }
+
+            canvas.restoreToCount(save);
         }
     }
 

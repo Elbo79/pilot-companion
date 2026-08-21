@@ -1,5 +1,6 @@
 package com.pilotcompanion.app;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -58,6 +59,15 @@ final class ScheduleRepository {
     }
 
     List<FlightLeg> forDate(LocalDate date) { return Collections.unmodifiableList(schedule.getOrDefault(date, List.of())); }
+
+    FlightLeg nextAssignmentAfter(Instant instant) {
+        return schedule.values().stream()
+                .flatMap(List::stream)
+                .filter(leg -> leg.departure().toInstant().isAfter(instant))
+                .min((a, b) -> a.departure().toInstant().compareTo(b.departure().toInstant()))
+                .orElse(null);
+    }
+
     LocalDate firstScheduledDate() { return schedule.keySet().stream().min(LocalDate::compareTo).orElse(LocalDate.now()); }
     LocalDate nearestScheduledDate(LocalDate target) {
         if (schedule.containsKey(target)) return target;

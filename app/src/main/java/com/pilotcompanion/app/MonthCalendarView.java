@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.view.MotionEvent;
 import android.view.View;
 import java.time.DayOfWeek;
@@ -27,31 +28,36 @@ final class MonthCalendarView extends View {
         this.repository = repository;
         this.importantDates = importantDates;
         selected = LocalDate.now();
-        paint.setTypeface(android.graphics.Typeface.create("sans", android.graphics.Typeface.NORMAL));
+        paint.setTypeface(Typeface.create("sans", Typeface.NORMAL));
     }
 
-    // Kept for compatibility with MainActivity navigation. The supplied month identifies the pay period
-    // whose end falls in that month, so the view always renders exactly the official 28 days.
     void setMonth(YearMonth month) {
         this.period = PayPeriodCalculator.containing(month.atEndOfMonth());
         invalidate();
     }
+
+    void setPeriod(PayPeriodCalculator.Period period) {
+        this.period = period;
+        invalidate();
+    }
+
     void setSelectedDate(LocalDate date) { this.selected = date; invalidate(); }
     void setOnDateSelectedListener(Consumer<LocalDate> listener) { this.listener = listener; }
 
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         float cellWidth = getWidth() / 7f;
-        float header = dp(30);
+        float header = dp(28);
         float cellHeight = (getHeight() - header) / 4f;
 
+        paint.setTypeface(Typeface.create("sans", Typeface.NORMAL));
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setTextSize(dp(11));
         paint.setColor(0xFF9FB3C8);
         for (int i = 0; i < 7; i++) {
             DayOfWeek day = DayOfWeek.of(((i + 6) % 7) + 1);
             canvas.drawText(day.getDisplayName(TextStyle.SHORT, Locale.US).toUpperCase(Locale.US),
-                    cellWidth * (i + .5f), dp(19), paint);
+                    cellWidth * (i + .5f), dp(18), paint);
         }
 
         for (int index = 0; index < 28; index++) {
@@ -61,13 +67,16 @@ final class MonthCalendarView extends View {
             float top = header + row * cellHeight;
             LocalDate date = period.start().plusDays(index);
 
+            // Alternate subtle blue hues when a pay period crosses into another month.
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor((date.getMonthValue() % 2 == 0) ? 0xFF0C2942 : 0xFF102F4B);
+            canvas.drawRect(left + dp(1), top + dp(1), left + cellWidth - dp(1), top + cellHeight - dp(1), paint);
+
             if (date.equals(LocalDate.now())) {
-                paint.setStyle(Paint.Style.FILL);
                 paint.setColor(0xFF1F5A78);
                 canvas.drawRoundRect(left + dp(2), top + dp(2), left + cellWidth - dp(2),
                         top + cellHeight - dp(2), dp(9), dp(9), paint);
             } else if (date.equals(selected)) {
-                paint.setStyle(Paint.Style.FILL);
                 paint.setColor(0xFF173B56);
                 canvas.drawRoundRect(left + dp(2), top + dp(2), left + cellWidth - dp(2),
                         top + cellHeight - dp(2), dp(9), dp(9), paint);
@@ -75,40 +84,52 @@ final class MonthCalendarView extends View {
 
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(dp(1));
-            paint.setColor(0xFF27445F);
+            paint.setColor(0xFF365A78);
             canvas.drawRect(left, top, left + cellWidth, top + cellHeight, paint);
 
             paint.setStyle(Paint.Style.FILL);
             paint.setTextAlign(Paint.Align.LEFT);
-            paint.setTextSize(dp(13));
-            paint.setColor(date.equals(LocalDate.now()) ? 0xFF68D8FF : Color.WHITE);
-            canvas.drawText(String.valueOf(date.getDayOfMonth()), left + dp(7), top + dp(19), paint);
+            paint.setTypeface(Typeface.create("sans", Typeface.BOLD));
+            paint.setTextSize(dp(11.5f));
+            boolean monthStart = index == 0 || date.getDayOfMonth() == 1;
+            String dateLabel = monthStart
+                    ? date.getMonth().getDisplayName(TextStyle.SHORT, Locale.US).toUpperCase(Locale.US) + " " + date.getDayOfMonth()
+                    : String.valueOf(date.getDayOfMonth());
+            paint.setColor(date.equals(LocalDate.now()) ? 0xFF7FE1FF : 0xFFB9DFFF);
+            canvas.drawText(dateLabel, left + dp(5), top + dp(17), paint);
 
-            float y = top + dp(35);
+            float y = top + dp(33);
             var legs = repository.forDate(date);
             if (!legs.isEmpty()) {
                 FlightLeg leg = legs.get(0);
-                paint.setTextSize(dp(8.5f));
+                paint.setTypeface(Typeface.create("sans", Typeface.NORMAL));
+                paint.setTextSize(dp(8.1f));
                 int stateColor = leg.isRevised() ? 0xFFFFC857 : leg.isTraded() ? 0xFF4DA3FF : 0xFF68D8FF;
                 paint.setColor(stateColor);
-                canvas.drawText(leg.origin() + ">" + leg.destination(), left + dp(5), y, paint); y += dp(12);
-                paint.setColor(0xFFE8F1F8);
-                canvas.drawText(leg.localTimes(), left + dp(5), y, paint); y += dp(12);
+                canvas.drawText(leg.origin() + ">" + leg.destination(), left + dp(4), y, paint); y += dp(11);
+
+                // Local time is the primary operational time, so make it bold.
+                paint.setTypeface(Typeface.create("sans", Typeface.BOLD));
+                paint.setColor(Color.WHITE);
+                canvas.drawText(leg.localTimes(), left + dp(4), y, paint); y += dp(11);
+
+                paint.setTypeface(Typeface.create("sans", Typeface.NORMAL));
                 paint.setColor(stateColor);
-                canvas.drawText(leg.seatPosition() + " " + leg.changeLabel(), left + dp(5), y, paint); y += dp(12);
+                canvas.drawText(leg.seatPosition() + " " + leg.changeLabel(), left + dp(4), y, paint); y += dp(11);
             }
 
             List<ImportantDate> events = importantDates.forDate(date);
             for (int i = 0; i < Math.min(events.size(), 2); i++) {
                 ImportantDate event = events.get(i);
-                paint.setTextSize(dp(7.5f));
+                paint.setTypeface(Typeface.create("sans", Typeface.NORMAL));
+                paint.setTextSize(dp(7.1f));
                 paint.setColor(eventColor(event.type()));
-                canvas.drawText(shortLabel(event.calendarLabel(), 18), left + dp(5), y, paint); y += dp(10);
+                canvas.drawText(shortLabel(event.calendarLabel(), 16), left + dp(4), y, paint); y += dp(9);
             }
             if (events.size() > 2) {
-                paint.setTextSize(dp(7.5f));
+                paint.setTextSize(dp(7.1f));
                 paint.setColor(0xFFB8C7D9);
-                canvas.drawText("+" + (events.size() - 2) + " dates", left + dp(5), y, paint);
+                canvas.drawText("+" + (events.size() - 2) + " dates", left + dp(4), y, paint);
             }
         }
     }
@@ -127,7 +148,7 @@ final class MonthCalendarView extends View {
 
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() != MotionEvent.ACTION_UP) return true;
-        float header = dp(30);
+        float header = dp(28);
         if (event.getY() < header) return true;
         int column = Math.min(6, (int) (event.getX() / (getWidth() / 7f)));
         int row = Math.min(3, (int) ((event.getY() - header) / ((getHeight() - header) / 4f)));

@@ -1,53 +1,67 @@
 # Pilot Companion
 
-Pilot Companion is an Android month-view planner for flight schedules. The first version shows each leg in the calendar and a selected-day detail panel with:
+Pilot Companion is an Android planner for UPS flight schedules. It shows local and Zulu times, elapsed block time, seat position, hotels, countdowns, traded/revised state, pay-period grouping, a shared schedule feed, and ANC First Officer administrative deadlines.
 
-- departure and arrival in each airport's local time;
-- elapsed flight time calculated from instants, so time-zone changes are handled correctly;
-- seat positions using the planner rules: `IRO` → `RO`, `FO2` → `FO2`, deadhead → `DH`, and every other assignment → `FO`;
-- previous/next month navigation.
+## Milestone 3 / Version 0.7
 
-Version 0.2 contains the August-September 2026 schedule transcribed from the supplied Flight Ops and Crew Access screenshots. Crew Access is authoritative when it revises an awarded leg; revised times are highlighted while the original scheduled values remain available for comparison.
+Version 0.7 adds an ANC 747 First Officer important-date layer directly to the month calendar.
 
-Version 0.3 restores the operational leg card. Tap a scheduled calendar day to see a live time-to-departure countdown, local times, block time, seat position, revision status, and the following hotel when one is listed in Crew Access.
+- **Blue = TRADED** for pilot-initiated trades made before the trip starts.
+- **Yellow = REVISED** for company revisions.
+- Once a trip has started, any later schedule change is classified as **REVISED**.
+- Current A70327R schedule remains loaded: ANC-SDF-CGN-SZX-ANC, with FO/FO/RO/RO positions.
+- Tapping a flight opens local and Zulu detail information.
+- **Upload schedule** continues to accept Crew Access screenshots/files without an APK rebuild.
+- **Sync now** continues to read the shared schedule feed for family devices.
 
-### Schedule source rules
+### ANC FO important dates
 
-- Flight Ops pairing detail is the original awarded schedule.
-- Crew Access is the current operational schedule and overrides matching awarded legs.
-- Source timestamps are converted to local time at each endpoint using the airport time zone.
-- Crew Access-only legs, including added deadheads, are added to the roster.
-- Position labels follow: `DH`, `FO2`, and `IRO`/`RO`; all other labels display as `FO`.
+The month view now displays dated events from the 2606 ANC 74Y First Officer bid transition timeline and the UPS 2026 Dates to Remember sheet, including:
+
+- Primary line-bid closing and award milestones
+- VTO/VTOR/RMUL/RSIM/LITT deadlines that apply to ANC FO
+- Primary, Secondary and Tertiary vacation bid posting, due, and award dates
+- BV banking deadline
+- Pay-period start/end boundaries
+- Published UPS paydays
+- BP2607 publication date
+
+Events with a contractual/administrative due date also get a **one-day-before REMINDER** entry in the calendar. Android notifications are scheduled one day before those deadlines; if the source provides no exact time, the reminder defaults to 09:00 ANC time. Notification permission is requested on Android 13+.
+
+### Pay-period boundaries currently loaded
+
+- PP09 ends Sep 6, 2026 at 02:59 ANC LDT
+- PP10 begins Sep 6 at 03:00 and ends Oct 4 at 02:59
+- PP11 begins Oct 4 at 03:00 and ends Nov 1 at 02:59
+- PP12 begins Nov 1 at 03:00 and ends Nov 29 at 02:59
+- PP13 begins Nov 29 at 03:00
+
+### Important source rule
+
+Exact event times are only shown when the UPS source supplies a time. Vacation/BV dates from the annual Dates to Remember sheet that do not include a clock time remain date-only rather than inventing a time.
+
+### Important sync distinction
+
+1. **In-app import:** owner can import a screenshot/file and use it immediately on that device; the import is stored locally.
+2. **Shared-device sync:** all devices pull the public `shared_schedule.txt` feed. Updating that feed updates every installed device after sync/startup without rebuilding the app.
+
+A future backend/OAuth step will allow an owner-device import to publish directly to the shared feed. No GitHub token or UPS credential is embedded in the APK.
 
 ## Install the latest debug APK
 
 1. Open this repository on GitHub and select **Actions**.
 2. Open the newest successful **Android debug APK** run.
 3. In **Artifacts**, download **pilot-companion-debug**.
-4. Unzip the download and copy `app-debug.apk` to the Android phone.
-5. Open the APK on the phone. If Android asks, allow the browser or file manager to **Install unknown apps**, then choose **Install**.
-
-Debug APKs are for testing and are retained by GitHub Actions for 30 days. Android may warn that the app is from an unknown developer because it is not Play Store signed.
+4. Unzip it and copy `app-debug.apk` to the Android phone.
+5. Open the APK and install it over the existing Pilot Companion app.
 
 ## Build locally
 
-Install Android Studio with Android SDK 36 and a Java 17 runtime, then open the repository and let Gradle sync. To build from a terminal:
+Use Android SDK 36 and Java 17, then run `./gradlew testDebugUnitTest assembleDebug` (Windows: `./gradlew.bat testDebugUnitTest assembleDebug`).
 
-```bash
-./gradlew testDebugUnitTest assembleDebug
-```
+## Next
 
-On Windows PowerShell, use `./gradlew.bat testDebugUnitTest assembleDebug`. The APK will be written to `app/build/outputs/apk/debug/app-debug.apk`.
-
-## Project structure
-
-- `app/src/main/java/com/pilotcompanion/app` — month planner, sample schedule, and flight calculations
-- `app/src/test` — seat-position and elapsed-time tests
-- `.github/workflows/android.yml` — debug APK build and artifact upload on every push
-
-## Roadmap
-
-- Import Crew Access screenshots with OCR
-- Parse trips automatically
-- Add pay and pay-period tracking
-- Add weather, hotel and airport maps, notifications, and logbook integration
+- Owner-authenticated publishing so a schedule imported on one phone automatically writes to the shared feed
+- More robust Crew Access OCR layouts and PDF parsing
+- Pay/credit tracking by pay period
+- Weather, hotel/airport maps, and logbook integration

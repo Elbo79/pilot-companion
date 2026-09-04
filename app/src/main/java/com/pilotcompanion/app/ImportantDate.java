@@ -8,6 +8,7 @@ public record ImportantDate(LocalDate date, LocalTime time, String title, Type t
 
     public String calendarLabel() {
         String timeText = time == null ? "" : " " + time.toString();
+        if (title.toUpperCase().startsWith("TRAINING")) return title + timeText;
         return switch (type) {
             case BID -> "BID " + title + timeText;
             case VACATION -> "VAC " + title + timeText;

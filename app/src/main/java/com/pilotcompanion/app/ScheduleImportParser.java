@@ -1,5 +1,6 @@
 package com.pilotcompanion.app;
 
+import java.time.LocalDate;
 import java.time.Month;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -10,16 +11,29 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class ScheduleImportParser {
-    private static final Pattern CREW_ACCESS = Pattern.compile(
+    private static final Pattern CREW_ACCESS_CARD = Pattern.compile(
             "(?i)(Aug|Sep|Oct|Nov|Dec|Jan|Feb|Mar|Apr|May|Jun|Jul)\\s+(\\d{1,2})\\s+(\\d{1,2}:\\d{2})\\s*-\\s*" +
             "(Aug|Sep|Oct|Nov|Dec|Jan|Feb|Mar|Apr|May|Jun|Jul)\\s+(\\d{1,2})\\s+(\\d{1,2}:\\d{2}).{0,80}?" +
             "UPS\\s*(\\d+).{0,100}?([A-Z]{3})\\s*-\\s*([A-Z]{3}).{0,80}?(F/O|R/O|IRO|FO2|DH)",
             Pattern.DOTALL);
 
+    // CMS/Crew Access "Trip Information" page. Zulu Start/End columns are authoritative.
+    // Example OCR row: "1 We 099 ANC-SDF 22:46 14:46 04:53 00:53 06:07 747"
+    private static final Pattern TRIP_DATE = Pattern.compile(
+            "(?i)Trip\\s*Id\\s*:?\\s*([A-Z]?\\d{4,6}R?)\\s+(\\d{1,2})(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(20\\d{2})");
+    private static final Pattern TRIP_ROW = Pattern.compile(
+            "(?i)(\\d{1,2})\\s+(?:Mo|Tu|We|Th|Fr|Sa|Su)\\s+" +
+            "(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\s+" +
+            "([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})(?:\\s+(IRO|R/O|RO|FO2|F/O))?\\s+" +
+            "(\\d{1,2}:\\d{2})\\s+(\\d{1,2}:\\d{2})\\s+" +
+            "(\\d{1,2}:\\d{2})\\s+(\\d{1,2}:\\d{2})");
+
     static List<FlightLeg> parseCrewAccessText(String text, FlightLeg.ChangeType requestedType, String pairing) {
-        String normalized = text.replace('\n', ' ').replaceAll("\\s+", " ");
-        List<FlightLeg> result = new ArrayList<>();
-        Matcher m = CREW_ACCESS.matcher(normalized);
+        List<FlightLeg> result = parseTripInformation(text, requestedType, pairing);
+        if (!result.isEmpty()) return result;
+
+        String normalized = normalize(text);
+        Matcher m = CREW_ACCESS_CARD.matcher(normalized);
         while (m.find()) {
             int depMonth = month(m.group(1));
             int depDay = Integer.parseInt(m.group(2));
@@ -29,9 +43,50 @@ final class ScheduleImportParser {
             String origin = m.group(8).toUpperCase(Locale.US);
             String destination = m.group(9).toUpperCase(Locale.US);
             String assignment = m.group(10).toUpperCase(Locale.US);
-            ZonedDateTime departureUtc = ZonedDateTime.parse(String.format(Locale.US, "2026-%02d-%02dT%sZ", depMonth, depDay, m.group(3)));
-            ZonedDateTime arrivalUtc = ZonedDateTime.parse(String.format(Locale.US, "2026-%02d-%02dT%sZ", arrMonth, arrDay, m.group(6)));
-            result.add(make(flight, origin, destination, departureUtc, arrivalUtc, assignment, requestedType, pairing, null, "Imported in app"));
+            ZonedDateTime departureUtc = ZonedDateTime.parse(String.format(Locale.US, "2026-%02d-%02dT%sZ", depMonth, depDay, twoDigitTime(m.group(3))));
+            ZonedDateTime arrivalUtc = ZonedDateTime.parse(String.format(Locale.US, "2026-%02d-%02dT%sZ", arrMonth, arrDay, twoDigitTime(m.group(6))));
+            result.add(make(flight, origin, destination, departureUtc, arrivalUtc, assignment, requestedType, pairing, null, "Imported Crew Access card"));
+        }
+        return result;
+    }
+
+    private static List<FlightLeg> parseTripInformation(String text, FlightLeg.ChangeType requestedType, String suppliedPairing) {
+        String normalized = normalize(text);
+        Matcher header = TRIP_DATE.matcher(normalized);
+        if (!header.find()) return List.of();
+
+        String detectedPairing = header.group(1).toUpperCase(Locale.US);
+        String pairing = suppliedPairing == null || suppliedPairing.isBlank() ? detectedPairing : suppliedPairing;
+        int startDay = Integer.parseInt(header.group(2));
+        int startMonth = month(header.group(3));
+        int year = Integer.parseInt(header.group(4));
+        LocalDate tripStart = LocalDate.of(year, startMonth, startDay);
+
+        List<FlightLeg> result = new ArrayList<>();
+        Matcher row = TRIP_ROW.matcher(normalized);
+        while (row.find()) {
+            int dutyDay = Integer.parseInt(row.group(1));
+            boolean deadhead = row.group(2) != null;
+            String number = row.group(3);
+            String origin = row.group(4).toUpperCase(Locale.US);
+            String destination = row.group(5).toUpperCase(Locale.US);
+            String seat = row.group(6);
+            String startZulu = twoDigitTime(row.group(7));
+            String endZulu = twoDigitTime(row.group(9));
+
+            LocalDate departureDate = tripStart.plusDays(dutyDay - 1L);
+            ZonedDateTime departureUtc = ZonedDateTime.parse(departureDate + "T" + startZulu + "Z");
+            ZonedDateTime arrivalUtc = ZonedDateTime.parse(departureDate + "T" + endZulu + "Z");
+            if (!arrivalUtc.isAfter(departureUtc)) arrivalUtc = arrivalUtc.plusDays(1);
+
+            String assignment;
+            if (deadhead) assignment = "DH";
+            else if (seat != null && !seat.isBlank()) assignment = seat.toUpperCase(Locale.US);
+            else assignment = "F/O";
+
+            String flight = deadhead ? "DH " + number : "UPS" + number;
+            result.add(make(flight, origin, destination, departureUtc, arrivalUtc, assignment,
+                    requestedType, pairing, null, "Imported Crew Access Trip Information"));
         }
         return result;
     }
@@ -61,6 +116,15 @@ final class ScheduleImportParser {
         ZonedDateTime arrival = arrivalUtc.withZoneSameInstant(zone(destination));
         return new FlightLeg(flight, origin, destination, departure, arrival, departure, arrival,
                 assignment, source, hotel, type, pairing == null ? "" : pairing);
+    }
+
+    private static String normalize(String text) {
+        return text.replace('\n', ' ').replace('\r', ' ').replaceAll("\\s+", " ").trim();
+    }
+
+    private static String twoDigitTime(String time) {
+        String[] parts = time.split(":");
+        return String.format(Locale.US, "%02d:%02d", Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
     }
 
     private static int month(String shortName) {

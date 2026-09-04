@@ -37,6 +37,13 @@ final class ImportantDateRepository {
         add(2026, 10, 5, null, null, "Payday", ImportantDate.Type.PAYDAY, false, "2026 Dates to Remember");
         add(2026, 10, 8, null, null, "Secondary vacation awards", ImportantDate.Type.VACATION, false, "2026 Dates to Remember");
         add(2026, 10, 11, null, null, "Tertiary vacation posted", ImportantDate.Type.VACATION, false, "2026 Dates to Remember");
+
+        // Current roster items from Crew Access screenshots supplied 04 Sep 2026.
+        // CQ06 card shows 15:30Z-00:30Z at ANC; 15:30Z = 07:30 AKDT on Oct 13.
+        add(2026, 10, 13, 7, 30, "TRAINING CQ06", ImportantDate.Type.BID, false, "Crew Access roster screenshot");
+        add(2026, 10, 18, null, null, "Vacation day", ImportantDate.Type.VACATION, false, "Crew Access roster screenshot");
+        add(2026, 10, 19, null, null, "Vacation day", ImportantDate.Type.VACATION, false, "Crew Access roster screenshot");
+
         add(2026, 10, 19, null, null, "Payday", ImportantDate.Type.PAYDAY, false, "2026 Dates to Remember");
         add(2026, 10, 25, null, null, "Tertiary vacation due", ImportantDate.Type.VACATION, true, "2026 Dates to Remember");
         add(2026, 10, 28, null, null, "Tertiary vacation awards", ImportantDate.Type.VACATION, false, "2026 Dates to Remember");

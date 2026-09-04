@@ -17,16 +17,26 @@ final class ScheduleImportParser {
             "UPS\\s*(\\d+).{0,100}?([A-Z]{3})\\s*-\\s*([A-Z]{3}).{0,80}?(F/O|R/O|IRO|FO2|DH)",
             Pattern.DOTALL);
 
-    // CMS/Crew Access "Trip Information" page. Zulu Start/End columns are authoritative.
-    // Example OCR row: "1 We 099 ANC-SDF 22:46 14:46 04:53 00:53 06:07 747"
     private static final Pattern TRIP_DATE = Pattern.compile(
             "(?i)Trip\\s*Id\\s*:?\\s*([A-Z]?\\d{4,6}R?)\\s+(\\d{1,2})(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(20\\d{2})");
+
+    // Strict row parser for ideal OCR output.
     private static final Pattern TRIP_ROW = Pattern.compile(
             "(?i)(\\d{1,2})\\s+(?:Mo|Tu|We|Th|Fr|Sa|Su)\\s+" +
             "(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\s+" +
             "([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})(?:\\s+(IRO|R/O|RO|FO2|F/O))?\\s+" +
             "(\\d{1,2}:\\d{2})\\s+(\\d{1,2}:\\d{2})\\s+" +
             "(\\d{1,2}:\\d{2})\\s+(\\d{1,2}:\\d{2})");
+
+    // Tolerant parser for the actual UPS Trip Information screenshot. ML Kit can separate the Day column
+    // from the flight row, so do not require "1 Fr" immediately before the flight number.
+    private static final Pattern TRIP_ROW_LOOSE = Pattern.compile(
+            "(?i)(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\s+" +
+            "([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})(?:\\s+(IRO|R/O|RO|FO2|F/O))?\\s+" +
+            "(\\d{1,2}:\\d{2})\\s+(\\d{1,2}:\\d{2})\\s+" +
+            "(\\d{1,2}:\\d{2})\\s+(\\d{1,2}:\\d{2})");
+
+    private static final Pattern DUTY_DAY = Pattern.compile("(?i)(\\d{1,2})\\s*(?:Mo|Tu|We|Th|Fr|Sa|Su)\\b");
 
     static List<FlightLeg> parseCrewAccessText(String text, FlightLeg.ChangeType requestedType, String pairing) {
         List<FlightLeg> result = parseTripInformation(text, requestedType, pairing);
@@ -62,6 +72,13 @@ final class ScheduleImportParser {
         int year = Integer.parseInt(header.group(4));
         LocalDate tripStart = LocalDate.of(year, startMonth, startDay);
 
+        List<FlightLeg> strict = parseStrictRows(normalized, requestedType, pairing, tripStart);
+        if (!strict.isEmpty()) return strict;
+        return parseLooseRows(normalized, requestedType, pairing, tripStart);
+    }
+
+    private static List<FlightLeg> parseStrictRows(String normalized, FlightLeg.ChangeType requestedType,
+                                                    String pairing, LocalDate tripStart) {
         List<FlightLeg> result = new ArrayList<>();
         Matcher row = TRIP_ROW.matcher(normalized);
         while (row.find()) {
@@ -73,22 +90,59 @@ final class ScheduleImportParser {
             String seat = row.group(6);
             String startZulu = twoDigitTime(row.group(7));
             String endZulu = twoDigitTime(row.group(9));
-
-            LocalDate departureDate = tripStart.plusDays(dutyDay - 1L);
-            ZonedDateTime departureUtc = ZonedDateTime.parse(departureDate + "T" + startZulu + "Z");
-            ZonedDateTime arrivalUtc = ZonedDateTime.parse(departureDate + "T" + endZulu + "Z");
-            if (!arrivalUtc.isAfter(departureUtc)) arrivalUtc = arrivalUtc.plusDays(1);
-
-            String assignment;
-            if (deadhead) assignment = "DH";
-            else if (seat != null && !seat.isBlank()) assignment = seat.toUpperCase(Locale.US);
-            else assignment = "F/O";
-
-            String flight = deadhead ? "DH " + number : "UPS" + number;
-            result.add(make(flight, origin, destination, departureUtc, arrivalUtc, assignment,
-                    requestedType, pairing, null, "Imported Crew Access Trip Information"));
+            result.add(buildTripLeg(dutyDay, deadhead, number, origin, destination, seat, startZulu,
+                    endZulu, requestedType, pairing, tripStart));
         }
         return result;
+    }
+
+    private static List<FlightLeg> parseLooseRows(String normalized, FlightLeg.ChangeType requestedType,
+                                                   String pairing, LocalDate tripStart) {
+        List<FlightLeg> result = new ArrayList<>();
+        Matcher row = TRIP_ROW_LOOSE.matcher(normalized);
+        int previousDutyDay = 1;
+        while (row.find()) {
+            boolean deadhead = row.group(1) != null;
+            String number = row.group(2);
+            String origin = row.group(3).toUpperCase(Locale.US);
+            String destination = row.group(4).toUpperCase(Locale.US);
+            String seat = row.group(5);
+            String startZulu = twoDigitTime(row.group(6));
+            String endZulu = twoDigitTime(row.group(8));
+
+            int dutyDay = nearestDutyDayBefore(normalized, row.start(), previousDutyDay);
+            previousDutyDay = dutyDay;
+            result.add(buildTripLeg(dutyDay, deadhead, number, origin, destination, seat, startZulu,
+                    endZulu, requestedType, pairing, tripStart));
+        }
+        return result;
+    }
+
+    private static int nearestDutyDayBefore(String text, int rowStart, int fallback) {
+        int from = Math.max(0, rowStart - 120);
+        String prefix = text.substring(from, rowStart);
+        Matcher matcher = DUTY_DAY.matcher(prefix);
+        Integer last = null;
+        while (matcher.find()) last = Integer.parseInt(matcher.group(1));
+        return last == null ? fallback : last;
+    }
+
+    private static FlightLeg buildTripLeg(int dutyDay, boolean deadhead, String number, String origin,
+                                          String destination, String seat, String startZulu, String endZulu,
+                                          FlightLeg.ChangeType requestedType, String pairing, LocalDate tripStart) {
+        LocalDate departureDate = tripStart.plusDays(dutyDay - 1L);
+        ZonedDateTime departureUtc = ZonedDateTime.parse(departureDate + "T" + startZulu + "Z");
+        ZonedDateTime arrivalUtc = ZonedDateTime.parse(departureDate + "T" + endZulu + "Z");
+        if (!arrivalUtc.isAfter(departureUtc)) arrivalUtc = arrivalUtc.plusDays(1);
+
+        String assignment;
+        if (deadhead) assignment = "DH";
+        else if (seat != null && !seat.isBlank()) assignment = seat.toUpperCase(Locale.US);
+        else assignment = "F/O";
+
+        String flight = deadhead ? "DH " + number : "UPS" + number;
+        return make(flight, origin, destination, departureUtc, arrivalUtc, assignment,
+                requestedType, pairing, null, "Imported Crew Access Trip Information");
     }
 
     static List<FlightLeg> parseSharedFormat(String text) {

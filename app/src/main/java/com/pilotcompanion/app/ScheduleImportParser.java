@@ -18,25 +18,13 @@ final class ScheduleImportParser {
             Pattern.DOTALL);
 
     private static final Pattern TRIP_DATE = Pattern.compile(
-            "(?i)Trip\\s*Id\\s*:?\\s*([A-Z]?\\d{4,6}R?)\\s+(\\d{1,2})(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(20\\d{2})");
+            "(?i)Trip\\s*Id\\s*:?\\s*([A-Z]?\\d{4,6}R?)\\s+(\\d{1,2})\\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s*(20\\d{2})");
 
-    // Strict row parser for ideal OCR output.
-    private static final Pattern TRIP_ROW = Pattern.compile(
-            "(?i)(\\d{1,2})\\s+(?:Mo|Tu|We|Th|Fr|Sa|Su)\\s+" +
-            "(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\s+" +
-            "([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})(?:\\s+(IRO|R/O|RO|FO2|F/O))?\\s+" +
-            "(\\d{1,2}:\\d{2})\\s+(\\d{1,2}:\\d{2})\\s+" +
-            "(\\d{1,2}:\\d{2})\\s+(\\d{1,2}:\\d{2})");
-
-    // Tolerant parser for the actual UPS Trip Information screenshot. ML Kit can separate the Day column
-    // from the flight row, so do not require "1 Fr" immediately before the flight number.
-    private static final Pattern TRIP_ROW_LOOSE = Pattern.compile(
-            "(?i)(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\s+" +
-            "([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})(?:\\s+(IRO|R/O|RO|FO2|F/O))?\\s+" +
-            "(\\d{1,2}:\\d{2})\\s+(\\d{1,2}:\\d{2})\\s+" +
-            "(\\d{1,2}:\\d{2})\\s+(\\d{1,2}:\\d{2})");
-
-    private static final Pattern DUTY_DAY = Pattern.compile("(?i)(\\d{1,2})\\s*(?:Mo|Tu|We|Th|Fr|Sa|Su)\\b");
+    // Loose route anchor designed for ML Kit OCR, where Day / Flight / route / time columns may wrap onto different OCR lines.
+    private static final Pattern ROUTE_ROW = Pattern.compile(
+            "(?i)(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\s+([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})(?:\\s+(IRO|R/O|RO|FO2|F/O))?");
+    private static final Pattern DUTY_DAY = Pattern.compile("(?i)(\\d{1,2})\\s*(Mo|Tu|We|Th|Fr|Sa|Su)");
+    private static final Pattern CLOCK = Pattern.compile("\\b(\\d{1,2}:\\d{2})\\b");
 
     static List<FlightLeg> parseCrewAccessText(String text, FlightLeg.ChangeType requestedType, String pairing) {
         List<FlightLeg> result = parseTripInformation(text, requestedType, pairing);
@@ -72,77 +60,50 @@ final class ScheduleImportParser {
         int year = Integer.parseInt(header.group(4));
         LocalDate tripStart = LocalDate.of(year, startMonth, startDay);
 
-        List<FlightLeg> strict = parseStrictRows(normalized, requestedType, pairing, tripStart);
-        if (!strict.isEmpty()) return strict;
-        return parseLooseRows(normalized, requestedType, pairing, tripStart);
-    }
-
-    private static List<FlightLeg> parseStrictRows(String normalized, FlightLeg.ChangeType requestedType,
-                                                    String pairing, LocalDate tripStart) {
         List<FlightLeg> result = new ArrayList<>();
-        Matcher row = TRIP_ROW.matcher(normalized);
+        Matcher row = ROUTE_ROW.matcher(normalized);
         while (row.find()) {
-            int dutyDay = Integer.parseInt(row.group(1));
-            boolean deadhead = row.group(2) != null;
-            String number = row.group(3);
-            String origin = row.group(4).toUpperCase(Locale.US);
-            String destination = row.group(5).toUpperCase(Locale.US);
-            String seat = row.group(6);
-            String startZulu = twoDigitTime(row.group(7));
-            String endZulu = twoDigitTime(row.group(9));
-            result.add(buildTripLeg(dutyDay, deadhead, number, origin, destination, seat, startZulu,
-                    endZulu, requestedType, pairing, tripStart));
-        }
-        return result;
-    }
+            int dutyDay = dutyDayBefore(normalized, row.start());
+            if (dutyDay < 1) continue; // Do not guess dates when OCR cannot establish the trip day.
 
-    private static List<FlightLeg> parseLooseRows(String normalized, FlightLeg.ChangeType requestedType,
-                                                   String pairing, LocalDate tripStart) {
-        List<FlightLeg> result = new ArrayList<>();
-        Matcher row = TRIP_ROW_LOOSE.matcher(normalized);
-        int previousDutyDay = 1;
-        while (row.find()) {
-            boolean deadhead = row.group(1) != null;
             String number = row.group(2);
             String origin = row.group(3).toUpperCase(Locale.US);
             String destination = row.group(4).toUpperCase(Locale.US);
             String seat = row.group(5);
-            String startZulu = twoDigitTime(row.group(6));
-            String endZulu = twoDigitTime(row.group(8));
+            boolean deadhead = row.group(1) != null;
 
-            int dutyDay = nearestDutyDayBefore(normalized, row.start(), previousDutyDay);
-            previousDutyDay = dutyDay;
-            result.add(buildTripLeg(dutyDay, deadhead, number, origin, destination, seat, startZulu,
-                    endZulu, requestedType, pairing, tripStart));
+            List<String> clocks = clocksAfter(normalized, row.end(), 180);
+            if (clocks.size() < 4) continue; // Require Zulu + local departure/arrival columns before accepting a leg.
+
+            String startZulu = twoDigitTime(clocks.get(0));
+            String endZulu = twoDigitTime(clocks.get(2));
+            LocalDate departureDate = tripStart.plusDays(dutyDay - 1L);
+            ZonedDateTime departureUtc = ZonedDateTime.parse(departureDate + "T" + startZulu + "Z");
+            ZonedDateTime arrivalUtc = ZonedDateTime.parse(departureDate + "T" + endZulu + "Z");
+            if (!arrivalUtc.isAfter(departureUtc)) arrivalUtc = arrivalUtc.plusDays(1);
+
+            String assignment = deadhead ? "DH" : (seat == null || seat.isBlank() ? "F/O" : seat.toUpperCase(Locale.US));
+            String flight = deadhead ? "DH " + number : "UPS" + number;
+            result.add(make(flight, origin, destination, departureUtc, arrivalUtc, assignment,
+                    requestedType, pairing, null, "Imported Crew Access Trip Information"));
         }
         return result;
     }
 
-    private static int nearestDutyDayBefore(String text, int rowStart, int fallback) {
-        int from = Math.max(0, rowStart - 120);
-        String prefix = text.substring(from, rowStart);
-        Matcher matcher = DUTY_DAY.matcher(prefix);
-        Integer last = null;
-        while (matcher.find()) last = Integer.parseInt(matcher.group(1));
-        return last == null ? fallback : last;
+    private static int dutyDayBefore(String text, int routeStart) {
+        int from = Math.max(0, routeStart - 140);
+        Matcher m = DUTY_DAY.matcher(text.substring(from, routeStart));
+        int last = -1;
+        while (m.find()) last = Integer.parseInt(m.group(1));
+        return last;
     }
 
-    private static FlightLeg buildTripLeg(int dutyDay, boolean deadhead, String number, String origin,
-                                          String destination, String seat, String startZulu, String endZulu,
-                                          FlightLeg.ChangeType requestedType, String pairing, LocalDate tripStart) {
-        LocalDate departureDate = tripStart.plusDays(dutyDay - 1L);
-        ZonedDateTime departureUtc = ZonedDateTime.parse(departureDate + "T" + startZulu + "Z");
-        ZonedDateTime arrivalUtc = ZonedDateTime.parse(departureDate + "T" + endZulu + "Z");
-        if (!arrivalUtc.isAfter(departureUtc)) arrivalUtc = arrivalUtc.plusDays(1);
-
-        String assignment;
-        if (deadhead) assignment = "DH";
-        else if (seat != null && !seat.isBlank()) assignment = seat.toUpperCase(Locale.US);
-        else assignment = "F/O";
-
-        String flight = deadhead ? "DH " + number : "UPS" + number;
-        return make(flight, origin, destination, departureUtc, arrivalUtc, assignment,
-                requestedType, pairing, null, "Imported Crew Access Trip Information");
+    private static List<String> clocksAfter(String text, int start, int maxChars) {
+        int end = Math.min(text.length(), start + maxChars);
+        Matcher m = CLOCK.matcher(text.substring(start, end));
+        List<String> out = new ArrayList<>();
+        while (m.find() && out.size() < 4) out.add(m.group(1));
+        return out;
     }
 
     static List<FlightLeg> parseSharedFormat(String text) {
@@ -194,8 +155,9 @@ final class ScheduleImportParser {
         return switch (airport) {
             case "ANC" -> ZoneId.of("America/Anchorage"); case "SDF" -> ZoneId.of("America/Kentucky/Louisville");
             case "HNL" -> ZoneId.of("Pacific/Honolulu"); case "HKG" -> ZoneId.of("Asia/Hong_Kong");
-            case "ICN" -> ZoneId.of("Asia/Seoul"); case "SZX" -> ZoneId.of("Asia/Shanghai");
+            case "ICN" -> ZoneId.of("Asia/Seoul"); case "SZX", "PVG" -> ZoneId.of("Asia/Shanghai");
             case "DEL" -> ZoneId.of("Asia/Kolkata"); case "CGN" -> ZoneId.of("Europe/Berlin");
+            case "CRK" -> ZoneId.of("Asia/Manila"); case "TPE" -> ZoneId.of("Asia/Taipei");
             default -> ZoneId.of("UTC");
         };
     }

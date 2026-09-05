@@ -17,14 +17,12 @@ final class ScheduleImportParser {
             "UPS\\s*(\\d+).{0,100}?([A-Z]{3})\\s*-\\s*([A-Z]{3}).{0,80}?(F/O|R/O|IRO|FO2|DH)",
             Pattern.DOTALL);
 
+    // ML Kit sometimes reads "Id" as "ld" or "1d", so accept those OCR variants.
     private static final Pattern TRIP_DATE = Pattern.compile(
-            "(?i)Trip\\s*Id\\s*:?\\s*([A-Z]?\\d{4,6}R?)\\s+(\\d{1,2})\\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s*(20\\d{2})");
+            "(?i)Trip\\s*[Iil1][dD]\\s*:?\\s*([A-Z]?\\d{4,6}R?)\\s+(\\d{1,2})\\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s*(20\\d{2})");
 
-    // First try normal row-shaped OCR.
     private static final Pattern ROUTE_ROW = Pattern.compile(
             "(?i)(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\s+([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})(?:\\s+(IRO|R/O|RO|FO2|F/O))?");
-
-    // Fallback for ML Kit OCR that splits the table into columns/blocks. Route is the strongest visual anchor.
     private static final Pattern ROUTE_ONLY = Pattern.compile("(?i)\\b([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})\\b");
     private static final Pattern DUTY_DAY = Pattern.compile("(?i)(\\d{1,2})\\s*(Mo|Tu|We|Th|Fr|Sa|Su)");
     private static final Pattern FLIGHT_BEFORE = Pattern.compile("(?i)(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\b");
@@ -76,7 +74,6 @@ final class ScheduleImportParser {
         while (row.find()) {
             int dutyDay = dutyDayBefore(normalized, row.start());
             if (dutyDay < 1) continue;
-
             String number = row.group(2);
             String origin = row.group(3).toUpperCase(Locale.US);
             String destination = row.group(4).toUpperCase(Locale.US);
@@ -96,12 +93,10 @@ final class ScheduleImportParser {
         while (route.find()) {
             int dutyDay = dutyDayBefore(normalized, route.start());
             if (dutyDay < 1) continue;
-
             String origin = route.group(1).toUpperCase(Locale.US);
             String destination = route.group(2).toUpperCase(Locale.US);
             FlightToken token = flightBefore(normalized, route.start());
             if (token == null) continue;
-
             FlightLeg leg = legFromAnchor(normalized, route.end(), dutyDay, token.number(), origin, destination,
                     null, token.deadhead(), requestedType, pairing, tripStart);
             if (leg != null && result.stream().noneMatch(x -> sameImportedLeg(x, leg))) result.add(leg);
@@ -114,15 +109,12 @@ final class ScheduleImportParser {
                                            FlightLeg.ChangeType requestedType, String pairing, LocalDate tripStart) {
         List<String> clocks = clocksAfter(normalized, anchorEnd, 260);
         if (clocks.size() < 4) return null;
-
-        // UPS Trip Information columns are Start(Z), Start(LT), End(Z), End(LT).
         String startZulu = twoDigitTime(clocks.get(0));
         String endZulu = twoDigitTime(clocks.get(2));
         LocalDate departureDate = tripStart.plusDays(dutyDay - 1L);
         ZonedDateTime departureUtc = ZonedDateTime.parse(departureDate + "T" + startZulu + "Z");
         ZonedDateTime arrivalUtc = ZonedDateTime.parse(departureDate + "T" + endZulu + "Z");
         if (!arrivalUtc.isAfter(departureUtc)) arrivalUtc = arrivalUtc.plusDays(1);
-
         String assignment = deadhead ? "DH" : (seat == null || seat.isBlank() ? "F/O" : seat.toUpperCase(Locale.US));
         String flight = deadhead ? "DH " + number : "UPS" + number;
         return make(flight, origin, destination, departureUtc, arrivalUtc, assignment,
@@ -148,7 +140,6 @@ final class ScheduleImportParser {
         FlightToken last = null;
         while (m.find()) {
             String number = m.group(2);
-            // Avoid accidentally treating a 4-digit year as a flight number.
             if (number.length() == 4 && number.startsWith("20")) continue;
             last = new FlightToken(number, m.group(1) != null);
         }

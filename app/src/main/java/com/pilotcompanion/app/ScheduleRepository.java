@@ -1,5 +1,6 @@
 package com.pilotcompanion.app;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -56,11 +57,29 @@ final class ScheduleRepository {
     void mergeImported(List<FlightLeg> imported) {
         for (FlightLeg leg : imported) {
             for (List<FlightLeg> existing : schedule.values()) {
-                existing.removeIf(old -> (!leg.pairing().isBlank() && leg.pairing().equals(old.pairing()) && leg.flightNumber().equals(old.flightNumber()))
-                        || (leg.flightNumber().equals(old.flightNumber()) && leg.origin().equals(old.origin()) && leg.destination().equals(old.destination())));
+                existing.removeIf(old -> sameLegIdentity(old, leg));
             }
             schedule.computeIfAbsent(leg.departure().toLocalDate(), ignored -> new ArrayList<>()).add(leg);
         }
+    }
+
+    private static boolean sameLegIdentity(FlightLeg old, FlightLeg incoming) {
+        // Pairing + flight number is the strongest identity. Repeated UPS flight numbers on later pairings
+        // must never delete an earlier trip (e.g. UPS099 appears several times in Sep/Oct 2026).
+        if (!old.pairing().isBlank() && !incoming.pairing().isBlank()) {
+            return old.pairing().equals(incoming.pairing())
+                    && old.flightNumber().equals(incoming.flightNumber())
+                    && old.origin().equals(incoming.origin())
+                    && old.destination().equals(incoming.destination());
+        }
+
+        // Legacy rows without pairing IDs may be replaced only when they are clearly the same occurrence:
+        // same flight/route and departure instants within 12 hours.
+        if (!old.flightNumber().equals(incoming.flightNumber())
+                || !old.origin().equals(incoming.origin())
+                || !old.destination().equals(incoming.destination())) return false;
+        long hours = Math.abs(Duration.between(old.departure().toInstant(), incoming.departure().toInstant()).toHours());
+        return hours <= 12;
     }
 
     private void addUtc(String number, String from, String to, String actualOut, String actualIn,

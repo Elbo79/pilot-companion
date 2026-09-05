@@ -62,4 +62,11 @@ public class ScheduleImportParserTest {
         assertEquals("Oct 1 08:16Z", legs.get(2).departureZulu());
         assertEquals("Oct 3 19:20Z", legs.get(3).departureZulu());
     }
+
+    @Test public void acceptsTripIdOcrAsLowercaseL() {
+        String text = "Trip ld: A70659 04Sep2026 1 Fr DH 071 ANC-SDF 09:13 01:13 15:20 11:20 747";
+        List<FlightLeg> legs = ScheduleImportParser.parseCrewAccessText(text, FlightLeg.ChangeType.ORIGINAL, "");
+        assertEquals(1, legs.size());
+        assertEquals("A70659", legs.get(0).pairing());
+    }
 }

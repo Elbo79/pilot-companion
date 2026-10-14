@@ -12,6 +12,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.graphics.Typeface;
 import android.view.Gravity;
+import android.content.res.Configuration;
+import android.util.TypedValue;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -49,6 +51,10 @@ public final class MainActivity extends Activity {
     private TextView syncStatus;
     private MonthCalendarView calendar;
     private LinearLayout detailPanel;
+    private LinearLayout screenRoot;
+    private ScrollView detailScroll;
+    private LinearLayout calendarArea;
+    private boolean wideLayout;
     private LocalDate selectedDate;
     private PayPeriodCalculator.Period currentPeriod;
     private final Handler clockHandler = new Handler(Looper.getMainLooper());
@@ -72,12 +78,30 @@ public final class MainActivity extends Activity {
         syncFromCloud();
     }
 
+    @Override public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        rebuildResponsiveLayout();
+    }
+
+    private boolean isWideLayout() {
+        return getResources().getConfiguration().screenWidthDp >= 600;
+    }
+
+    private void rebuildResponsiveLayout() {
+        LocalDate date = selectedDate;
+        setContentView(buildScreen());
+        showMonth();
+        showDay(date);
+    }
+
     @Override protected void onResume() { super.onResume(); clockHandler.removeCallbacks(clockTick); clockHandler.post(clockTick); }
     @Override protected void onPause() { clockHandler.removeCallbacks(clockTick); super.onPause(); }
 
     private View buildScreen() {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(6), dp(8), dp(6), dp(8));
+        screenRoot = root;
+        wideLayout = isWideLayout();
+        root.setPadding(dp(wideLayout ? 14 : 8), dp(8), dp(wideLayout ? 14 : 8), dp(8));
         root.setFitsSystemWindows(true); root.setBackgroundColor(0xFF071B2F);
         TextView appName = label("PILOT COMPANION", 13, 0xFF68D8FF); appName.setLetterSpacing(.18f); root.addView(appName);
         root.addView(label("Blue = traded   Yellow = company revised", 11, 0xFFB8C7D9));
@@ -86,8 +110,8 @@ public final class MainActivity extends Activity {
         LinearLayout actions = new LinearLayout(this); actions.setGravity(Gravity.CENTER_VERTICAL);
         Button upload = smallButton("Upload schedule"); Button sync = smallButton("Sync now");
         syncStatus = label("Shared schedule: connecting…", 10, 0xFFB8C7D9);
-        actions.addView(upload, new LinearLayout.LayoutParams(0, dp(40), 1));
-        actions.addView(sync, new LinearLayout.LayoutParams(0, dp(40), 1)); root.addView(actions); root.addView(syncStatus);
+        actions.addView(upload, new LinearLayout.LayoutParams(0, dp(48), 1));
+        actions.addView(sync, new LinearLayout.LayoutParams(0, dp(48), 1)); root.addView(actions); root.addView(syncStatus);
         upload.setOnClickListener(v -> openSchedulePicker()); sync.setOnClickListener(v -> syncFromCloud());
 
         LinearLayout controls = new LinearLayout(this); controls.setGravity(Gravity.CENTER_VERTICAL);
@@ -101,14 +125,21 @@ public final class MainActivity extends Activity {
         calendar.setPeriod(currentPeriod);
         calendar.setSelectedDate(selectedDate);
         calendar.setOnDateSelectedListener(this::showDay);
-        root.addView(calendar, new LinearLayout.LayoutParams(-1, 0, 1));
+        calendarArea = new LinearLayout(this);
+        calendarArea.setOrientation(wideLayout ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        root.addView(calendarArea, new LinearLayout.LayoutParams(-1, 0, 1));
+        calendarArea.addView(calendar, wideLayout
+                ? new LinearLayout.LayoutParams(0, -1, 3f)
+                : new LinearLayout.LayoutParams(-1, 0, 1f));
 
         detailPanel = new LinearLayout(this); detailPanel.setOrientation(LinearLayout.VERTICAL);
         detailPanel.setPadding(dp(10), dp(6), dp(10), dp(6)); detailPanel.setBackgroundColor(0xFF102A43);
-        ScrollView detailScroll = new ScrollView(this);
+        detailScroll = new ScrollView(this);
         detailScroll.setFillViewport(false);
         detailScroll.addView(detailPanel);
-        root.addView(detailScroll, new LinearLayout.LayoutParams(-1, dp(220)));
+        calendarArea.addView(detailScroll, wideLayout
+                ? new LinearLayout.LayoutParams(0, -1, 2f)
+                : new LinearLayout.LayoutParams(-1, 0, 1f));
 
         previous.setOnClickListener(v -> {
             currentPeriod = PayPeriodCalculator.shift(currentPeriod, -1);

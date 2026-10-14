@@ -115,6 +115,8 @@ final class ScheduleImportParser {
         ZonedDateTime departureUtc = ZonedDateTime.parse(departureDate + "T" + startZulu + "Z");
         ZonedDateTime arrivalUtc = ZonedDateTime.parse(departureDate + "T" + endZulu + "Z");
         if (!arrivalUtc.isAfter(departureUtc)) arrivalUtc = arrivalUtc.plusDays(1);
+        long elapsed = java.time.Duration.between(departureUtc, arrivalUtc).toMinutes();
+        if (elapsed < 30 || elapsed > 1200) return null;
         String assignment = deadhead ? "DH" : (seat == null || seat.isBlank() ? "F/O" : seat.toUpperCase(Locale.US));
         String flight = deadhead ? "DH " + number : "UPS" + number;
         return make(flight, origin, destination, departureUtc, arrivalUtc, assignment,

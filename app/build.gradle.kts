@@ -18,7 +18,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true\n            isShrinkResources = true
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -29,6 +30,7 @@ android {
     }
 }
 
-dependencies {\n    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+dependencies {
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
     testImplementation("junit:junit:4.13.2")
 }

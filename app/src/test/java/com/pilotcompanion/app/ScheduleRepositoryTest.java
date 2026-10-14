@@ -9,7 +9,7 @@ public class ScheduleRepositoryTest {
         ZonedDateTime departure=Instant.parse("2026-11-05T19:53:00Z").atZone(ZoneId.of("America/Anchorage"));
         ZonedDateTime arrival=Instant.parse("2026-11-06T08:05:00Z").atZone(ZoneId.of("Asia/Shanghai"));
         FlightLeg leg=new FlightLeg("UPS076-2","ANC","SZX",departure,arrival,departure,arrival,"FO","2607",null);
-        assertEquals("11:53-16:05",leg.localTimes());
+        assertEquals("10:53-16:05",leg.localTimes());
         assertEquals("12h 12m",leg.flightTime());
     }
     @Test public void preservesIroAndDeadheadAssignments(){

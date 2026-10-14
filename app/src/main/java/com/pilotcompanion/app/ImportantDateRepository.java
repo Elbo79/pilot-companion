@@ -56,6 +56,11 @@ final class ImportantDateRepository {
         add(2026, 11, 29, 3, 0, "PP13 begins", ImportantDate.Type.PAY_PERIOD, false, "2026 Dates to Remember");
         add(2026, 11, 30, null, null, "Payday", ImportantDate.Type.PAYDAY, false, "2026 Dates to Remember");
 
+        add(2026, 11, 1, null, null, "BP2607 begins • Awarded ANC FO Line 159", ImportantDate.Type.BID, false, "User-confirmed line award / 2607 bid package");
+        add(2026, 11, 5, null, null, "Line 159 • Trip 354", ImportantDate.Type.BID, false, "2607 ANC 74Y bid line 159");
+        add(2026, 11, 12, null, null, "Line 159 • Trip 354", ImportantDate.Type.BID, false, "2607 ANC 74Y bid line 159");
+        add(2026, 11, 19, null, null, "Line 159 • Trip 354", ImportantDate.Type.BID, false, "2607 ANC 74Y bid line 159");
+        add(2026, 11, 22, null, null, "Line 159 • Trip 432", ImportantDate.Type.BID, false, "2607 ANC 74Y bid line 159");
         // One-day advance reminder entries for every deadline/due date.
         List<ImportantDate> reminders = dates.stream().filter(ImportantDate::deadline).map(d ->
                 new ImportantDate(d.date().minusDays(1), d.time(), d.title() + " tomorrow", ImportantDate.Type.REMINDER, false, d.source())

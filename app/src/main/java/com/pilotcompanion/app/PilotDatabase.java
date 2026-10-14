@@ -13,14 +13,28 @@ import java.util.*;
 
 final class PilotDatabase extends SQLiteOpenHelper {
     private final Context context;
-    PilotDatabase(Context context) { super(context, "pilot_schedule.db", null, 1); this.context=context.getApplicationContext(); }
+    PilotDatabase(Context context) { super(context, "pilot_schedule.db", null, 2); this.context=context.getApplicationContext(); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE flights (identity TEXT PRIMARY KEY, flight TEXT NOT NULL, origin TEXT NOT NULL, destination TEXT NOT NULL, departure TEXT NOT NULL, arrival TEXT NOT NULL, scheduled_departure TEXT NOT NULL, scheduled_arrival TEXT NOT NULL, assignment TEXT, source TEXT, hotel TEXT, change_type TEXT, pairing TEXT)");
         db.execSQL("CREATE INDEX idx_flights_departure ON flights(departure)");
         db.execSQL("CREATE TABLE important_dates (identity TEXT PRIMARY KEY, date TEXT NOT NULL, time TEXT, title TEXT NOT NULL, type TEXT NOT NULL, deadline INTEGER NOT NULL, source TEXT)");
         seed(db);
+        seedNovember(db);
     }
-    @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion) {}
+    @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion) {
+        if(oldVersion<2){
+            // Replace incorrect Nov 19 Line 159 placeholder, retain all imported flights.
+            db.delete("important_dates","date=? AND title=?",new String[]{"2026-11-19","Line 159 • Trip 354"});
+            seedNovember(db);
+        }
+    }
+    private void seedNovember(SQLiteDatabase db){
+        try{
+            String json=new String(context.getAssets().open("november_line159.json").readAllBytes(),StandardCharsets.UTF_8);
+            JSONArray legs=new JSONArray(json);
+            for(int i=0;i<legs.length();i++)insert(db,ScheduleRepository.fromSeed(legs.getJSONObject(i)));
+        }catch(Exception e){android.util.Log.e("PilotDatabase","Could not seed November flights",e);}
+    }
     private void seed(SQLiteDatabase db) {
         try {
             String json=new String(context.getAssets().open("seed_flights.json").readAllBytes(), StandardCharsets.UTF_8);

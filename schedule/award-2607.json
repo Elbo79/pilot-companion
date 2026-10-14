@@ -1,0 +1,11 @@
+{
+  "bidPeriod": "2607",
+  "line": 159,
+  "domicile": "ANC",
+  "fleet": "747",
+  "position": "FO",
+  "effectiveDate": "2026-11-01",
+  "source": "Pilot-reported award 2026-10-13; 2026 Dates to Remember p.1 for start date",
+  "tripDetailsStatus": "pending official 2607 line 159 pairing data",
+  "notes": "Do not populate legs from 2606 bid package; retain existing 2606 schedule separately."
+}

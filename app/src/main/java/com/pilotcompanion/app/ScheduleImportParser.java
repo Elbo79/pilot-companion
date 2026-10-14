@@ -22,10 +22,10 @@ final class ScheduleImportParser {
             "(?i)Trip\\s*[Iil1][dD]\\s*:?\\s*([A-Z]?\\d{4,6}R?)\\s+(\\d{1,2})\\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s*(20\\d{2})");
 
     private static final Pattern ROUTE_ROW = Pattern.compile(
-            "(?i)(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\s+([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})(?:\\s+(IRO|R/O|RO|FO2|F/O))?");
+            "(?i)(DH\\s*)?(?:UPS\\s*)?(\\d{2,4}(?:-\\d)?)\\s+([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})(?:\\s+(IRO|R/O|RO|FO2|F/O))?");
     private static final Pattern ROUTE_ONLY = Pattern.compile("(?i)\\b([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})\\b");
     private static final Pattern DUTY_DAY = Pattern.compile("(?i)(\\d{1,2})\\s*(Mo|Tu|We|Th|Fr|Sa|Su)");
-    private static final Pattern FLIGHT_BEFORE = Pattern.compile("(?i)(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\b");
+    private static final Pattern FLIGHT_BEFORE = Pattern.compile("(?i)(DH\\s*)?(?:UPS\\s*)?(\\d{2,4}(?:-\\d)?)\\b");
     private static final Pattern CLOCK = Pattern.compile("\\b(\\d{1,2}:\\d{2})\\b");
 
     static List<FlightLeg> parseCrewAccessText(String text, FlightLeg.ChangeType requestedType, String pairing) {

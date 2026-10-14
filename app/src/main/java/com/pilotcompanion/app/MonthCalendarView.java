@@ -70,7 +70,11 @@ final class MonthCalendarView extends View {
             canvas.drawText(String.valueOf(day), left + dp(7), top + dp(19), paint);
 
             var legs = repository.forDate(date);
-            if (legs.isEmpty() && !repository.notes(date).isEmpty()) {\n                paint.setTextSize(dp(10));paint.setColor(0xFFFFC857);\n                canvas.drawText("★ Important", left + dp(4), top + dp(36), paint);\n            }\n            if (!legs.isEmpty()) {
+            if (legs.isEmpty() && !repository.notes(date).isEmpty()) {
+                paint.setTextSize(dp(10));paint.setColor(0xFFFFC857);
+                canvas.drawText("★ Important", left + dp(4), top + dp(36), paint);
+            }
+            if (!legs.isEmpty()) {
                 FlightLeg leg = legs.get(0);
                 paint.setTextSize(dp(9));
                 paint.setColor(leg.isRevised() ? 0xFFFFC857 : 0xFF68D8FF);

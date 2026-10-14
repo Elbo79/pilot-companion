@@ -1,71 +1,87 @@
 package com.pilotcompanion.app;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import android.content.Context;
+import org.json.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.time.*;
+import java.util.*;
 
 final class ScheduleRepository {
-    private static final ZoneId UTC = ZoneId.of("UTC");
-    private final Map<LocalDate, List<FlightLeg>> schedule = new HashMap<>();
-
-    ScheduleRepository() {
-        addUtc("UPS52", "ANC", "HKG", "2026-08-03T18:47", "2026-08-04T04:44", "2026-08-03T18:08", "2026-08-04T05:10", "F/O", "Crew Access revision", "New World Millennium Hong Kong");
-        addUtc("UPS67", "HKG", "ICN", "2026-08-06T02:37", "2026-08-06T06:18", "2026-08-06T02:15", "2026-08-06T05:45", "F/O", "Crew Access revision", "Sheraton Incheon");
-        addUtc("UPS6011", "ICN", "DEL", "2026-08-08T01:19", "2026-08-08T08:46", null, null, "F/O", "Crew Access", "Andaz Delhi");
-        addUtc("UPS15", "DEL", "CGN", "2026-08-09T08:10", "2026-08-09T17:06", null, null, "F/O", "Crew Access", "Cologne Marriott Hotel");
-        addUtc("UPS224", "CGN", "SDF", "2026-08-10T17:25", "2026-08-11T02:17", null, null, "R/O", "Crew Access", "Galt House");
-        addUtc("UPS5074", "SDF", "ANC", "2026-08-11T19:50", "2026-08-12T02:44", null, null, "DH", "Crew Access", null);
-
-        addUtc("UPS64", "ANC", "ICN", "2026-08-19T17:37", "2026-08-20T02:25", null, null, "F/O", "Crew Access", "Sheraton Incheon");
-        addUtc("UPS11", "ICN", "DEL", "2026-08-21T02:33", "2026-08-21T10:00", null, null, "R/O", "Crew Access", "Andaz Delhi");
-        addUtc("UPS17", "DEL", "CGN", "2026-08-23T13:00", "2026-08-23T21:56", null, null, "R/O", "Crew Access", "Cologne Marriott Hotel");
-        addUtc("UPS14", "CGN", "SZX", "2026-08-25T03:47", "2026-08-25T15:30", null, null, "F/O", "Crew Access", "JW Marriott Shenzhen");
-        addUtc("UPS77", "SZX", "ANC", "2026-08-26T11:10", "2026-08-26T21:13", null, null, "F/O", "Crew Access", null);
-
-        addUtc("UPS197", "ANC", "SDF", "2026-09-04T07:13", "2026-09-04T13:26", null, null, "F/O", "Crew Access", "Galt House");
-        addUtc("UPS36", "SDF", "HNL", "2026-09-05T11:26", "2026-09-05T20:31", null, null, "F/O", "Crew Access", "Ala Moana Honolulu by Mantra");
-        addUtc("UPS35", "HNL", "ICN", "2026-09-07T06:45", "2026-09-07T16:20", null, null, "DH", "Crew Access revision", "Sheraton Incheon");
-        addUtc("UPS99", "ICN", "ANC", "2026-09-08T12:50", "2026-09-08T20:51", null, null, "F/O", "Crew Access revision", null);
+    private final Map<LocalDate,List<FlightLeg>> schedule=new HashMap<>();
+    private final Map<LocalDate,List<String>> reminders=new HashMap<>();
+    private final Context context;
+    ScheduleRepository(Context context){this.context=context;loadAward();loadSaved();}
+    private static ZoneId zone(String code){return switch(code){
+        case "ANC"->ZoneId.of("America/Anchorage");case "SDF"->ZoneId.of("America/Kentucky/Louisville");
+        case "CGN"->ZoneId.of("Europe/Berlin");case "SZX"->ZoneId.of("Asia/Shanghai");
+        case "ICN"->ZoneId.of("Asia/Seoul");case "HKG"->ZoneId.of("Asia/Hong_Kong");
+        case "DEL"->ZoneId.of("Asia/Kolkata");case "HNL"->ZoneId.of("Pacific/Honolulu");
+        case "ONT"->ZoneId.of("America/Los_Angeles");case "SYD"->ZoneId.of("Australia/Sydney");
+        case "CRK"->ZoneId.of("Asia/Manila");default->ZoneOffset.UTC;};}
+    void add(String number,String from,String to,String out,String in,String seat,String source){
+        try {
+            ZonedDateTime dep=LocalDateTime.parse(out).atZone(ZoneOffset.UTC).withZoneSameInstant(zone(from));
+            ZonedDateTime arr=LocalDateTime.parse(in).atZone(ZoneOffset.UTC).withZoneSameInstant(zone(to));
+            FlightLeg leg=new FlightLeg(number,from,to,dep,arr,dep,arr,seat,source,null);
+            schedule.computeIfAbsent(dep.toLocalDate(),k->new ArrayList<>()).add(leg);
+        }catch(Exception ignored){}
     }
-
-    private void addUtc(String number, String from, String to, String actualOut, String actualIn,
-                        String scheduledOut, String scheduledIn, String assignment, String source,
-                        String hotel) {
-        ZonedDateTime departure = ZonedDateTime.parse(actualOut + "Z").withZoneSameInstant(airportZone(from));
-        ZonedDateTime arrival = ZonedDateTime.parse(actualIn + "Z").withZoneSameInstant(airportZone(to));
-        ZonedDateTime scheduledDeparture = scheduledOut == null ? departure
-                : ZonedDateTime.parse(scheduledOut + "Z").withZoneSameInstant(airportZone(from));
-        ZonedDateTime scheduledArrival = scheduledIn == null ? arrival
-                : ZonedDateTime.parse(scheduledIn + "Z").withZoneSameInstant(airportZone(to));
-        FlightLeg leg = new FlightLeg(number, from, to, departure, arrival,
-                scheduledDeparture, scheduledArrival, assignment, source, hotel);
-        schedule.computeIfAbsent(departure.toLocalDate(), ignored -> new ArrayList<>()).add(leg);
+    private void loadAward(){
+        try(InputStream stream=context.getAssets().open("award-2607.json")){
+            String json=new String(stream.readAllBytes(),StandardCharsets.UTF_8);
+            JSONObject root=new JSONObject(json);
+            JSONArray trips=root.getJSONArray("trips");
+            for(int i=0;i<trips.length();i++){
+                JSONObject trip=trips.getJSONObject(i);
+                JSONArray dates=trip.getJSONArray("reportDatesZulu"),legs=trip.getJSONArray("legs");
+                for(int d=0;d<dates.length();d++){
+                    LocalDate report=LocalDate.parse(dates.getString(d));
+                    LocalDate cursor=report;
+                    Instant prior=null;
+                    for(int j=0;j<legs.length();j++){
+                        JSONObject leg=legs.getJSONObject(j);
+                        String out=leg.getString("departureZulu"),in=leg.getString("arrivalZulu");
+                        LocalDateTime departure=LocalDateTime.of(cursor,LocalTime.parse(out));
+                        if(prior!=null){while(!departure.toInstant(ZoneOffset.UTC).isAfter(prior))departure=departure.plusDays(1);}
+                        LocalDateTime arrival=LocalDateTime.of(departure.toLocalDate(),LocalTime.parse(in));
+                        while(!arrival.isAfter(departure))arrival=arrival.plusDays(1);
+                        prior=arrival.toInstant(ZoneOffset.UTC);cursor=arrival.toLocalDate();
+                        String seat=leg.optBoolean("deadhead")?"DH":leg.optBoolean("iro")?"IRO":leg.optString("seatPosition","UNKNOWN");
+                        add(leg.getString("flight"),leg.getString("from"),leg.getString("to"),departure.toString(),arrival.toString(),seat,"2607 bid / Trip "+trip.getInt("tripNumber"));
+                    }
+                }
+            }
+            JSONArray dates=root.optJSONArray("importantDates");
+            if(dates!=null)for(int i=0;i<dates.length();i++){JSONObject o=dates.getJSONObject(i);if(!o.isNull("date"))remind(LocalDate.parse(o.getString("date")),o.getString("label"));}
+        }catch(Exception ignored){}
     }
-
-    List<FlightLeg> forDate(LocalDate date) {
-        return Collections.unmodifiableList(schedule.getOrDefault(date, List.of()));
+    private void remind(LocalDate date,String message){reminders.computeIfAbsent(date,k->new ArrayList<>()).add(message);}
+    private void loadSaved(){
+        try(BufferedReader reader=new BufferedReader(new InputStreamReader(context.openFileInput("schedule.csv")))){
+            String line;while((line=reader.readLine())!=null)parseLine(line);
+        }catch(Exception ignored){}
     }
-
-    LocalDate firstScheduledDate() {
-        return schedule.keySet().stream().min(LocalDate::compareTo).orElse(LocalDate.now());
+    private void parseLine(String line){
+        String[] a=line.trim().split(",",-1);
+        if(a.length==7)add(a[1].trim(),a[2].trim().toUpperCase(Locale.US),a[3].trim().toUpperCase(Locale.US),a[4].trim(),a[5].trim(),a[6].trim(),"Imported screenshot / CSV");
     }
-
-    private static ZoneId airportZone(String airport) {
-        return switch (airport) {
-            case "ANC" -> ZoneId.of("America/Anchorage");
-            case "SDF" -> ZoneId.of("America/Kentucky/Louisville");
-            case "HNL" -> ZoneId.of("Pacific/Honolulu");
-            case "HKG" -> ZoneId.of("Asia/Hong_Kong");
-            case "ICN" -> ZoneId.of("Asia/Seoul");
-            case "SZX" -> ZoneId.of("Asia/Shanghai");
-            case "DEL" -> ZoneId.of("Asia/Kolkata");
-            case "CGN" -> ZoneId.of("Europe/Berlin");
-            default -> UTC;
-        };
+    int importCsv(String text){
+        int count=0;StringBuilder accepted=new StringBuilder();
+        for(String line:text.split("\\R")){
+            String[] a=line.trim().split(",",-1);
+            if(a.length!=7)continue;
+            try{
+                LocalDate.parse(a[0].trim());LocalDateTime.parse(a[4].trim());LocalDateTime.parse(a[5].trim());
+                if(!a[2].trim().matches("[A-Za-z]{3}")||!a[3].trim().matches("[A-Za-z]{3}"))continue;
+                parseLine(line);accepted.append(line.trim()).append('\n');count++;
+            }catch(Exception ignored){}
+        }
+        if(count>0)try(FileOutputStream f=context.openFileOutput("schedule.csv",Context.MODE_APPEND)){f.write(accepted.toString().getBytes(StandardCharsets.UTF_8));}catch(Exception ignored){}
+        return count;
     }
+    List<FlightLeg> forDate(LocalDate date){return schedule.getOrDefault(date,List.of());}
+    List<String> notes(LocalDate date){return reminders.getOrDefault(date,List.of());}
+    LocalDate firstScheduledDate(){return LocalDate.of(2026,10,1);}
+    boolean hasAnything(LocalDate date){return !forDate(date).isEmpty()||!notes(date).isEmpty();}
 }

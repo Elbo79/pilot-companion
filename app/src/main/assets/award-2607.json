@@ -1,0 +1,164 @@
+{
+  "bidPeriod": "2607",
+  "line": 159,
+  "domicile": "ANC",
+  "fleet": "747",
+  "position": "FO",
+  "effectiveDate": "2026-11-01",
+  "periodEnd": "2026-11-29",
+  "source": "2607 ANC 74Y Bid Package lines.pdf: trip reports 354 and 432; 2607 ANC 74Y Bid Packagelines(1).pdf: line 159",
+  "timeZone": "UTC",
+  "trips": [
+    {
+      "tripNumber": 354,
+      "reportDatesZulu": [
+        "2026-11-05",
+        "2026-11-12",
+        "2026-11-19"
+      ],
+      "reportTimeZulu": "18:23",
+      "tafB": "60:40",
+      "blockTime": "22:00",
+      "creditTime": "22:00",
+      "layovers": [
+        {
+          "airport": "SZX",
+          "rest": "34:40"
+        }
+      ],
+      "legs": [
+        {
+          "flight": "UPS 076-2",
+          "from": "ANC",
+          "to": "SZX",
+          "departureZulu": "19:53",
+          "arrivalZulu": "08:05",
+          "block": "12:12",
+          "aircraft": "74N",
+          "iro": false
+        },
+        {
+          "flight": "UPS 071",
+          "from": "SZX",
+          "to": "ANC",
+          "departureZulu": "20:45",
+          "arrivalZulu": "06:33",
+          "block": "09:48",
+          "aircraft": "74N",
+          "iro": false
+        }
+      ],
+      "note": "Trip repeats on Thursdays November 5, 12, and 19. Times are Zulu and arrival may be on following UTC day."
+    },
+    {
+      "tripNumber": 432,
+      "reportDatesZulu": [
+        "2026-11-22"
+      ],
+      "reportTimeZulu": "11:22",
+      "tafB": "115:38",
+      "blockTime": "21:26",
+      "creditTime": "35:23",
+      "layovers": [
+        {
+          "airport": "SDF",
+          "rest": "17:01"
+        },
+        {
+          "airport": "CGN",
+          "rest": "30:59"
+        },
+        {
+          "airport": "SZX",
+          "rest": "24:15"
+        }
+      ],
+      "legs": [
+        {
+          "flight": "UPS 065-2",
+          "from": "ANC",
+          "to": "SDF",
+          "departureZulu": "12:52",
+          "arrivalZulu": "18:57",
+          "block": "06:05",
+          "deadhead": true,
+          "iro": false
+        },
+        {
+          "flight": "UPS 201",
+          "from": "SDF",
+          "to": "CGN",
+          "departureZulu": "13:58",
+          "arrivalZulu": "21:50",
+          "block": "07:52",
+          "deadhead": true,
+          "iro": false
+        },
+        {
+          "flight": "UPS 014",
+          "from": "CGN",
+          "to": "SZX",
+          "departureZulu": "06:49",
+          "arrivalZulu": "18:30",
+          "block": "11:41",
+          "deadhead": false,
+          "iro": true,
+          "seatPosition": "RO"
+        },
+        {
+          "flight": "UPS 093",
+          "from": "SZX",
+          "to": "ANC",
+          "departureZulu": "20:45",
+          "arrivalZulu": "06:30",
+          "block": "09:45",
+          "deadhead": false,
+          "iro": false
+        }
+      ]
+    }
+  ],
+  "creditTime": "79:23",
+  "blockTime": "65:26",
+  "daysOff": 16,
+  "dutyDays": 11,
+  "importantDates": [
+    {
+      "date": "2026-11-01",
+      "label": "2607 bid period begins",
+      "status": "confirmed"
+    },
+    {
+      "date": "2026-11-05",
+      "label": "Trip 354 #1 report",
+      "status": "confirmed"
+    },
+    {
+      "date": "2026-11-12",
+      "label": "Trip 354 #2 report",
+      "status": "confirmed"
+    },
+    {
+      "date": "2026-11-19",
+      "label": "Trip 354 #3 report",
+      "status": "confirmed"
+    },
+    {
+      "date": "2026-11-22",
+      "label": "Trip 432 report",
+      "status": "confirmed"
+    },
+    {
+      "date": "2026-11-29",
+      "label": "2607 bid period ends",
+      "status": "confirmed"
+    },
+    {
+      "date": null,
+      "label": "2608 bid package release",
+      "status": "needs verification",
+      "notes": "Not specified in available 2607 bid-line trip reports; do not invent a date."
+    }
+  ],
+  "notes": "Bid pairing data is scheduled, not a live revised crew schedule. Exact seat positions for non-IRO legs are not confirmed. Retain 2606 separately."
+}

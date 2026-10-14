@@ -262,7 +262,7 @@ public final class MainActivity extends Activity {
         var prefs=getSharedPreferences(PREFS, MODE_PRIVATE);
         String archive=prefs.getString("import_archive", "");
         for(String row:archive.split("\\n")){
-            String[] parts=row.split("\\\\|",3);
+            String[] parts=row.split("\\|",3);
             if(parts.length!=3)continue;
             try{
                 FlightLeg.ChangeType type=FlightLeg.ChangeType.valueOf(parts[0]);

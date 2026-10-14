@@ -236,10 +236,28 @@ public final class MainActivity extends Activity {
     }
 
     private void chooseImportType(String text) {
-        String pairing = detectPairing(text); String[] choices = {"Traded by me (blue)", "Company revised (yellow)", "Original schedule"};
+        String pairing = detectPairing(text);
+        String[] choices = {"Traded by me (blue)", "Company revised (yellow)", "Original schedule"};
         new AlertDialog.Builder(this).setTitle("How did this schedule change?").setItems(choices, (dialog, which) -> {
             FlightLeg.ChangeType type = which == 0 ? FlightLeg.ChangeType.TRADED : which == 1 ? FlightLeg.ChangeType.REVISED : FlightLeg.ChangeType.ORIGINAL;
-            importText(text, type, pairing, true);
+            List<FlightLeg> preview = ScheduleImportParser.parseCrewAccessText(text, type, pairing);
+            if (preview.isEmpty()) {
+                new AlertDialog.Builder(this).setTitle("No flights recognized")
+                    .setMessage("This screenshot did not contain recognizable Crew Access flight rows. Try a full-resolution screenshot showing Trip Id, the flight numbers, routes, and both Zulu columns. No schedule was changed.")
+                    .setPositiveButton("OK", null).show();
+                return;
+            }
+            StringBuilder summary = new StringBuilder("Found " + preview.size() + " flight(s). Review before saving:\n\n");
+            for (FlightLeg leg : preview) {
+                summary.append(leg.flightNumber()).append("  ").append(leg.origin()).append(" → ")
+                    .append(leg.destination()).append("\n")
+                    .append(leg.departureZulu()).append(" → ").append(leg.arrivalZulu()).append("\n");
+            }
+            new AlertDialog.Builder(this).setTitle("Confirm imported flights")
+                .setMessage(summary.toString())
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save to schedule", (d, w) -> importText(text, type, pairing, true))
+                .show();
         }).show();
     }
 

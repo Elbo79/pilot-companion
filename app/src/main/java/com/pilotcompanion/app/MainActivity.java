@@ -15,6 +15,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -74,7 +75,8 @@ public final class MainActivity extends Activity {
 
     private View buildScreen() {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(6), dp(8), dp(6), dp(8)); root.setBackgroundColor(0xFF071B2F);
+        root.setPadding(dp(6), dp(8), dp(6), dp(8));
+        root.setFitsSystemWindows(true); root.setBackgroundColor(0xFF071B2F);
         TextView appName = label("PILOT COMPANION", 13, 0xFF68D8FF); appName.setLetterSpacing(.18f); root.addView(appName);
         root.addView(label("Blue = traded   Yellow = company revised", 11, 0xFFB8C7D9));
         root.addView(label("ANC FO dates: bids • vacation • pay periods • paydays • reminders", 10, 0xFFFFD166));
@@ -101,7 +103,10 @@ public final class MainActivity extends Activity {
 
         detailPanel = new LinearLayout(this); detailPanel.setOrientation(LinearLayout.VERTICAL);
         detailPanel.setPadding(dp(10), dp(6), dp(10), dp(6)); detailPanel.setBackgroundColor(0xFF102A43);
-        root.addView(detailPanel, new LinearLayout.LayoutParams(-1, dp(205)));
+        ScrollView detailScroll = new ScrollView(this);
+        detailScroll.setFillViewport(false);
+        detailScroll.addView(detailPanel);
+        root.addView(detailScroll, new LinearLayout.LayoutParams(-1, dp(220)));
 
         previous.setOnClickListener(v -> {
             currentPeriod = PayPeriodCalculator.shift(currentPeriod, -1);
@@ -243,19 +248,50 @@ public final class MainActivity extends Activity {
         FlightLeg.ChangeType effective = requestedType;
         if (requestedType == FlightLeg.ChangeType.TRADED && Instant.now().isAfter(firstDeparture)) { effective = FlightLeg.ChangeType.REVISED; legs = ScheduleImportParser.parseCrewAccessText(text, effective, pairing); }
         repository.mergeImported(legs);
-        if (persist) getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("import_text", text).putString("import_type", effective.name()).putString("import_pairing", pairing).apply();
+        if (persist) saveImportedSchedule(text, effective, pairing);
         selectedDate = LocalDate.now();
         currentPeriod = PayPeriodCalculator.containing(selectedDate);
         visibleMonth = YearMonth.from(currentPeriod.end());
         showMonth(); showDay(selectedDate); Toast.makeText(this, "Schedule imported: " + legs.size() + " flights", Toast.LENGTH_SHORT).show();
     }
 
+    private void saveImportedSchedule(String text, FlightLeg.ChangeType type, String pairing) {
+        // Keep every confirmed import rather than overwriting the previous screenshot.
+        // Bound the retained OCR text to avoid growing app storage indefinitely.
+        String existing = getSharedPreferences(PREFS, MODE_PRIVATE).getString("import_archive", "");
+        String encoded = android.util.Base64.encodeToString(text.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP);
+        String record = type.name() + "|" + android.util.Base64.encodeToString(pairing.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP) + "|" + encoded;
+        if (!existing.contains(record)) {
+            String combined = existing + record + "\\n";
+            if (combined.length() > 500_000) combined = combined.substring(Math.max(0, combined.length() - 500_000));
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("import_archive", combined).apply();
+        }
+    }
+
     private void restoreLastImport() {
-        String text = getSharedPreferences(PREFS, MODE_PRIVATE).getString("import_text", ""); if (text.isBlank()) return;
-        try {
-            FlightLeg.ChangeType type = FlightLeg.ChangeType.valueOf(getSharedPreferences(PREFS, MODE_PRIVATE).getString("import_type", "ORIGINAL"));
-            String pairing = getSharedPreferences(PREFS, MODE_PRIVATE).getString("import_pairing", ""); repository.mergeImported(ScheduleImportParser.parseCrewAccessText(text, type, pairing));
-        } catch (RuntimeException ignored) { }
+        var prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String archive = prefs.getString("import_archive", "");
+        for (String row : archive.split("\\n")) {
+            String[] parts = row.split("\\|", 3);
+            if (parts.length != 3) continue;
+            try {
+                FlightLeg.ChangeType type = FlightLeg.ChangeType.valueOf(parts[0]);
+                String pairing = new String(android.util.Base64.decode(parts[1], android.util.Base64.DEFAULT), StandardCharsets.UTF_8);
+                String text = new String(android.util.Base64.decode(parts[2], android.util.Base64.DEFAULT), StandardCharsets.UTF_8);
+                repository.mergeImported(ScheduleImportParser.parseCrewAccessText(text, type, pairing));
+            } catch (RuntimeException ignored) { }
+        }
+        // Migrate the single import from previous releases without deleting it.
+        String legacy = prefs.getString("import_text", "");
+        if (!legacy.isBlank()) {
+            try {
+                FlightLeg.ChangeType type = FlightLeg.ChangeType.valueOf(prefs.getString("import_type", "ORIGINAL"));
+                String pairing = prefs.getString("import_pairing", "");
+                repository.mergeImported(ScheduleImportParser.parseCrewAccessText(legacy, type, pairing));
+                saveImportedSchedule(legacy, type, pairing);
+                prefs.edit().remove("import_text").remove("import_type").remove("import_pairing").apply();
+            } catch (RuntimeException ignored) { }
+        }
     }
 
     private void syncFromCloud() {

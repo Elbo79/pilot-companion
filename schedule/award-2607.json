@@ -5,7 +5,44 @@
   "fleet": "747",
   "position": "FO",
   "effectiveDate": "2026-11-01",
-  "source": "Pilot-reported award 2026-10-13; 2026 Dates to Remember p.1 for start date",
-  "tripDetailsStatus": "pending official 2607 line 159 pairing data",
-  "notes": "Do not populate legs from 2606 bid package; retain existing 2606 schedule separately."
+  "periodEnd": "2026-11-29",
+  "source": "2607 ANC 747 UPS Bid Lines, page 34 (PDF page 36), Line 159; user-confirmed award",
+  "tripDetailsStatus": "line-level pairings loaded; individual leg timestamps and seat assignments require pairing details",
+  "lineForFirstOfficerOnly": true,
+  "trips": [
+    {
+      "tripNumber": 354,
+      "sequence": 1,
+      "reportTime": "1823",
+      "blockTime": "22:00",
+      "routeSummary": [
+        "SZX"
+      ]
+    },
+    {
+      "tripNumber": 354,
+      "sequence": 2,
+      "reportTime": "1823",
+      "blockTime": "22:00",
+      "routeSummary": [
+        "SZX"
+      ]
+    },
+    {
+      "tripNumber": 432,
+      "sequence": 3,
+      "reportTime": "1122",
+      "blockTime": "35:23",
+      "routeSummary": [
+        "SDF",
+        "CGN",
+        "SZX"
+      ]
+    }
+  ],
+  "creditTime": "79:23",
+  "blockTime": "65:26",
+  "daysOff": 16,
+  "dutyDays": 11,
+  "notes": "Dates and flight legs not inferred from compressed bid line; use official pairing detail for precise times. Retain 2606 separately."
 }

@@ -58,6 +58,8 @@ public final class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        repository.attach(this);
+        importantDates.attach(this);
         restoreLastImport();
         selectedDate = LocalDate.now();
         currentPeriod = PayPeriodCalculator.containing(selectedDate);
@@ -248,50 +250,35 @@ public final class MainActivity extends Activity {
         FlightLeg.ChangeType effective = requestedType;
         if (requestedType == FlightLeg.ChangeType.TRADED && Instant.now().isAfter(firstDeparture)) { effective = FlightLeg.ChangeType.REVISED; legs = ScheduleImportParser.parseCrewAccessText(text, effective, pairing); }
         repository.mergeImported(legs);
-        if (persist) saveImportedSchedule(text, effective, pairing);
+        // Imported legs are persisted in SQLite by ScheduleRepository.mergeImported.
         selectedDate = LocalDate.now();
         currentPeriod = PayPeriodCalculator.containing(selectedDate);
         visibleMonth = YearMonth.from(currentPeriod.end());
         showMonth(); showDay(selectedDate); Toast.makeText(this, "Schedule imported: " + legs.size() + " flights", Toast.LENGTH_SHORT).show();
     }
 
-    private void saveImportedSchedule(String text, FlightLeg.ChangeType type, String pairing) {
-        // Keep every confirmed import rather than overwriting the previous screenshot.
-        // Bound the retained OCR text to avoid growing app storage indefinitely.
-        String existing = getSharedPreferences(PREFS, MODE_PRIVATE).getString("import_archive", "");
-        String encoded = android.util.Base64.encodeToString(text.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP);
-        String record = type.name() + "|" + android.util.Base64.encodeToString(pairing.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP) + "|" + encoded;
-        if (!existing.contains(record)) {
-            String combined = existing + record + "\n";
-            if (combined.length() > 500_000) combined = combined.substring(Math.max(0, combined.length() - 500_000));
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("import_archive", combined).apply();
-        }
-    }
-
     private void restoreLastImport() {
-        var prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        String archive = prefs.getString("import_archive", "");
-        for (String row : archive.split("\\n")) {
-            String[] parts = row.split("\\|", 3);
-            if (parts.length != 3) continue;
-            try {
-                FlightLeg.ChangeType type = FlightLeg.ChangeType.valueOf(parts[0]);
-                String pairing = new String(android.util.Base64.decode(parts[1], android.util.Base64.DEFAULT), StandardCharsets.UTF_8);
-                String text = new String(android.util.Base64.decode(parts[2], android.util.Base64.DEFAULT), StandardCharsets.UTF_8);
-                repository.mergeImported(ScheduleImportParser.parseCrewAccessText(text, type, pairing));
-            } catch (RuntimeException ignored) { }
+        // One-time migration from prior releases; after this, SQLite is authoritative.
+        var prefs=getSharedPreferences(PREFS, MODE_PRIVATE);
+        String archive=prefs.getString("import_archive", "");
+        for(String row:archive.split("\\n")){
+            String[] parts=row.split("\\\\|",3);
+            if(parts.length!=3)continue;
+            try{
+                FlightLeg.ChangeType type=FlightLeg.ChangeType.valueOf(parts[0]);
+                String pairing=new String(android.util.Base64.decode(parts[1],android.util.Base64.DEFAULT),StandardCharsets.UTF_8);
+                String raw=new String(android.util.Base64.decode(parts[2],android.util.Base64.DEFAULT),StandardCharsets.UTF_8);
+                repository.mergeImported(ScheduleImportParser.parseCrewAccessText(raw,type,pairing));
+            }catch(RuntimeException ignored){}
         }
-        // Migrate the single import from previous releases without deleting it.
-        String legacy = prefs.getString("import_text", "");
-        if (!legacy.isBlank()) {
-            try {
-                FlightLeg.ChangeType type = FlightLeg.ChangeType.valueOf(prefs.getString("import_type", "ORIGINAL"));
-                String pairing = prefs.getString("import_pairing", "");
-                repository.mergeImported(ScheduleImportParser.parseCrewAccessText(legacy, type, pairing));
-                saveImportedSchedule(legacy, type, pairing);
-                prefs.edit().remove("import_text").remove("import_type").remove("import_pairing").apply();
-            } catch (RuntimeException ignored) { }
+        String legacy=prefs.getString("import_text","");
+        if(!legacy.isBlank()){
+            try{
+                FlightLeg.ChangeType type=FlightLeg.ChangeType.valueOf(prefs.getString("import_type","ORIGINAL"));
+                repository.mergeImported(ScheduleImportParser.parseCrewAccessText(legacy,type,prefs.getString("import_pairing","")));
+            }catch(RuntimeException ignored){}
         }
+        prefs.edit().remove("import_archive").remove("import_text").remove("import_type").remove("import_pairing").apply();
     }
 
     private void syncFromCloud() {

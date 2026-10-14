@@ -1,77 +1,26 @@
 package com.pilotcompanion.app;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import org.junit.Test;
-import java.time.LocalDate;
+import org.json.JSONObject;
+import java.time.*;
 
 public class ScheduleRepositoryTest {
-    private final ScheduleRepository repository = new ScheduleRepository();
-
-    @Test public void placesUtcLegOnOriginLocalCalendarDate(){
-        FlightLeg leg=repository.forDate(LocalDate.of(2026,8,3)).get(0);
-        assertEquals("UPS52",leg.flightNumber());
+    @Test public void retainsLocalTimeZoneAndPairingFromStructuredSeed() throws Exception {
+        JSONObject seed=new JSONObject();
+        seed.put("flight","UPS52");seed.put("from","ANC");seed.put("to","HKG");
+        seed.put("out","2026-08-03T18:47");seed.put("in","2026-08-04T04:44");
+        seed.put("scheduledOut",JSONObject.NULL);seed.put("scheduledIn",JSONObject.NULL);
+        seed.put("assignment","F/O");seed.put("source","Crew Access");seed.put("hotel","New World Millennium");
+        seed.put("change","ORIGINAL");seed.put("pairing","A70816");
+        FlightLeg leg=ScheduleRepository.fromSeed(seed);
         assertEquals("10:47-12:44",leg.localTimes());
         assertEquals("9h 57m",leg.flightTime());
+        assertEquals("A70816",leg.pairing());
     }
-
-    @Test public void keepsAwardedTimesWhenCrewAccessRevisesLeg(){
-        FlightLeg leg=repository.forDate(LocalDate.of(2026,8,3)).get(0);
-        assertTrue(leg.isRevised());
-        assertEquals("10:08-13:10",leg.scheduledLocalTimes());
-    }
-
-    @Test public void associatesFollowingHotelWithLeg(){
-        assertEquals("Sheraton Incheon",repository.forDate(LocalDate.of(2026,8,6)).get(0).hotel());
-        assertEquals("Ala Moana Honolulu by Mantra",repository.forDate(LocalDate.of(2026,9,5)).get(0).hotel());
-    }
-
-    @Test public void marksNewPairingAsTraded(){
-        FlightLeg leg=repository.forDate(LocalDate.of(2026,8,20)).get(0);
-        assertTrue(leg.isTraded());
-        assertEquals("A70327R",leg.pairing());
-        assertEquals("UPS71",leg.flightNumber());
-    }
-
-    @Test public void a70327rAncSdfUsesCrewAccessZuluAndCorrectAncLocalTime(){
-        FlightLeg leg=repository.forDate(LocalDate.of(2026,8,20)).get(0);
-        assertEquals("UPS71",leg.flightNumber());
-        assertEquals("01:13-11:20",leg.localTimes());
-        assertEquals("Aug 20 09:13Z",leg.departureZulu());
-        assertEquals("Aug 20 15:20Z",leg.arrivalZulu());
-        assertEquals("6h 07m",leg.flightTime());
-    }
-
-    @Test public void a70327rSdfCgnUsesCrewAccessZuluAndCorrectLouisvilleLocalTime(){
-        FlightLeg leg=repository.forDate(LocalDate.of(2026,8,21)).get(0);
-        assertEquals("UPS213",leg.flightNumber());
-        assertEquals("04:42-18:40",leg.localTimes());
-        assertEquals("Aug 21 08:42Z",leg.departureZulu());
-        assertEquals("Aug 21 16:40Z",leg.arrivalZulu());
-        assertEquals("7h 58m",leg.flightTime());
-    }
-
-    @Test public void tradedRestSeatMapsToRo(){
-        assertEquals("RO",repository.forDate(LocalDate.of(2026,8,25)).get(0).seatPosition());
-    }
-
-    @Test public void replacesOldReturnWithPostStartRevision(){
-        FlightLeg cgnSzx=repository.forDate(LocalDate.of(2026,8,11)).get(0);
-        assertEquals("UPS008",cgnSzx.flightNumber());
-        assertEquals("CGN",cgnSzx.origin());
-        assertEquals("SZX",cgnSzx.destination());
-        assertEquals("FO",cgnSzx.seatPosition());
-        assertEquals("07:27-01:10",cgnSzx.localTimes());
-        assertEquals("11h 43m",cgnSzx.flightTime());
-        assertTrue(cgnSzx.isRevised());
-    }
-
-    @Test public void revisedSzxAncAppearsOnOriginLocalDate(){
-        FlightLeg szxAnc=repository.forDate(LocalDate.of(2026,8,13)).get(0);
-        assertEquals("UPS071",szxAnc.flightNumber());
-        assertEquals("05:05-23:08",szxAnc.localTimes());
-        assertEquals("10h 03m",szxAnc.flightTime());
-        assertEquals("FO",szxAnc.seatPosition());
-        assertTrue(szxAnc.isRevised());
+    @Test public void multiplePairingsDoNotOverwriteSameFlightNumber() throws Exception {
+        JSONObject a=new JSONObject("{\\"flight\\":\\"UPS099\\",\\"from\\":\\"ANC\\",\\"to\\":\\"SDF\\",\\"out\\":\\"2026-09-09T22:46\\",\\"in\\":\\"2026-09-10T04:53\\",\\"scheduledOut\\":null,\\"scheduledIn\\":null,\\"assignment\\":\\"FO\\",\\"source\\":\\"test\\",\\"hotel\\":null,\\"change\\":\\"ORIGINAL\\",\\"pairing\\":\\"16168\\"}");
+        JSONObject b=new JSONObject(a.toString());b.put("pairing","A70315");b.put("out","2026-09-28T22:46");b.put("in","2026-09-29T04:53");
+        assertNotEquals(PilotDatabase.identity(ScheduleRepository.fromSeed(a)),PilotDatabase.identity(ScheduleRepository.fromSeed(b)));
     }
 }

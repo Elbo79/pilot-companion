@@ -69,4 +69,15 @@ public class ScheduleImportParserTest {
         assertEquals(1, legs.size());
         assertEquals("A70659", legs.get(0).pairing());
     }
+    @Test public void importsHyphenatedFlightNumbersFromCrewAccessTable(){
+        String text = "Trip Id: A70816 03Aug2026 Day Flight Departure-Arrival Start Start(LT) End End(LT) " +
+                "1 Mo Duty start 16:38 08:38 076-2 ANC-SZX 18:47 10:47 07:00 15:00 12:13 747 " +
+                "3 We Duty start 18:15 02:15 DH UPS 065-2 SZX-ANC 19:45 03:45 05:15 21:15 09:30 747";
+        List<FlightLeg> legs = ScheduleImportParser.parseCrewAccessText(text,FlightLeg.ChangeType.ORIGINAL,"");
+        assertEquals(2,legs.size());
+        assertEquals("UPS076-2",legs.get(0).flightNumber());
+        assertEquals("DH 065-2",legs.get(1).flightNumber());
+        assertEquals("DH",legs.get(1).seatPosition());
+    }
+
 }

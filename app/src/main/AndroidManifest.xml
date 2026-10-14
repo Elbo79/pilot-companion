@@ -9,6 +9,7 @@
         android:theme="@style/Theme.PilotCompanion">
         <activity
             android:name=".MainActivity"
+            android:configChanges="screenSize|smallestScreenSize|orientation|screenLayout|keyboardHidden"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

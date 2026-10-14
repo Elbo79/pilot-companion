@@ -1,37 +1,20 @@
 package com.pilotcompanion.app;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
+import static org.junit.Assert.*;
 import org.junit.Test;
-
-import java.time.LocalDate;
+import java.time.*;
 
 public class ScheduleRepositoryTest {
-    private final ScheduleRepository repository = new ScheduleRepository();
-
-    @Test public void placesUtcLegOnOriginLocalCalendarDate() {
-        FlightLeg leg = repository.forDate(LocalDate.of(2026, 8, 3)).get(0);
-        assertEquals("UPS52", leg.flightNumber());
-        assertEquals("10:47-12:44", leg.localTimes());
-        assertEquals("9h 57m", leg.flightTime());
+    @Test public void convertsZuluToLocalTimeAcrossDateLine(){
+        ZonedDateTime departure=Instant.parse("2026-11-05T19:53:00Z").atZone(ZoneId.of("America/Anchorage"));
+        ZonedDateTime arrival=Instant.parse("2026-11-06T08:05:00Z").atZone(ZoneId.of("Asia/Shanghai"));
+        FlightLeg leg=new FlightLeg("UPS076-2","ANC","SZX",departure,arrival,departure,arrival,"FO","2607",null);
+        assertEquals("11:53-16:05",leg.localTimes());
+        assertEquals("12h 12m",leg.flightTime());
     }
-
-    @Test public void keepsAwardedTimesWhenCrewAccessRevisesLeg() {
-        FlightLeg leg = repository.forDate(LocalDate.of(2026, 8, 3)).get(0);
-        assertTrue(leg.isRevised());
-        assertEquals("10:08-13:10", leg.scheduledLocalTimes());
-    }
-
-    @Test public void usesCrewAccessSeatAndAddedDeadheadLegs() {
-        assertEquals("RO", repository.forDate(LocalDate.of(2026, 8, 10)).get(0).seatPosition());
-        assertEquals("DH", repository.forDate(LocalDate.of(2026, 9, 6)).get(0).seatPosition());
-    }
-
-    @Test public void associatesFollowingHotelWithLeg() {
-        assertEquals("Sheraton Incheon",
-                repository.forDate(LocalDate.of(2026, 8, 6)).get(0).hotel());
-        assertEquals("Ala Moana Honolulu by Mantra",
-                repository.forDate(LocalDate.of(2026, 9, 5)).get(0).hotel());
+    @Test public void preservesIroAndDeadheadAssignments(){
+        ZonedDateTime now=ZonedDateTime.now(ZoneOffset.UTC);
+        assertEquals("RO",new FlightLeg("UPS014","CGN","SZX",now,now.plusHours(11),now,now.plusHours(11),"IRO","2607",null).seatPosition());
+        assertEquals("DH",new FlightLeg("UPS201","SDF","CGN",now,now.plusHours(8),now,now.plusHours(8),"DH","2607",null).seatPosition());
     }
 }

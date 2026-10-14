@@ -262,7 +262,7 @@ public final class MainActivity extends Activity {
         String encoded = android.util.Base64.encodeToString(text.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP);
         String record = type.name() + "|" + android.util.Base64.encodeToString(pairing.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP) + "|" + encoded;
         if (!existing.contains(record)) {
-            String combined = existing + record + "\\n";
+            String combined = existing + record + "\n";
             if (combined.length() > 500_000) combined = combined.substring(Math.max(0, combined.length() - 500_000));
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("import_archive", combined).apply();
         }

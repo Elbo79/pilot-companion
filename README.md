@@ -1,5 +1,7 @@
 # Pilot Companion
 
+Version 0.12 adds the layover duration to the calendar leg summary and the tapped-flight details. The duration follows the Crew Access hotel window convention (30 minutes after block-in through 90 minutes before the next flight) and is shown separately from block-to-block time.
+
 Pilot Companion is an Android planner for UPS flight schedules. It shows local and Zulu times, elapsed block time, seat position, hotels, countdowns, traded/revised state, pay-period grouping, a shared schedule feed, and ANC First Officer administrative deadlines.
 
 ## Milestone 3 / Version 0.7

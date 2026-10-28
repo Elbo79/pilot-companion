@@ -156,7 +156,11 @@ public final class MainActivity extends Activity {
 
             detailPanel.addView(label("Zulu " + leg.zuluTimes(), 12, 0xFFB8C7D9));
             detailPanel.addView(label("California " + leg.californiaTimes(), 12, 0xFF9AD5FF));
-            if (leg.hotel() != null) detailPanel.addView(label("Hotel: " + leg.hotel(), 12, 0xFFB8E986));
+            if (leg.hotel() != null) {
+                Duration layover = repository.layoverAfter(leg);
+                String duration = layover == null ? "" : "  •  Layover " + compactDuration(layover);
+                detailPanel.addView(label("Hotel: " + leg.hotel() + duration, 12, 0xFFB8E986));
+            }
         }
 
         if (!events.isEmpty()) {
@@ -206,8 +210,15 @@ public final class MainActivity extends Activity {
                 "\nLOCAL TIMES\nDepart " + leg.origin() + ": " + leg.departure().format(local) + "\nArrive " + leg.destination() + ": " + leg.arrival().format(local) + "\n" +
                 "\nZULU TIMES\nDepart: " + leg.departureZulu() + "\nArrive: " + leg.arrivalZulu() + "\n" +
                 "\nCALIFORNIA TIME\nDepart: " + leg.departureCalifornia() + "\nArrive: " + leg.arrivalCalifornia() + "\n" +
-                "\nFlight time: " + leg.flightTime() + "\n" + (leg.hotel() == null ? "" : "Hotel: " + leg.hotel() + "\n") + "Source: " + leg.source();
+                "\nFlight time: " + leg.flightTime() + "\n" + hotelDetails(leg) + "Source: " + leg.source();
         new AlertDialog.Builder(this).setTitle(leg.flightNumber() + " • " + leg.origin() + " → " + leg.destination()).setMessage(message).setPositiveButton("Close", null).show();
+    }
+
+    private String hotelDetails(FlightLeg leg) {
+        if (leg.hotel() == null) return "";
+        Duration layover = repository.layoverAfter(leg);
+        return "Hotel: " + leg.hotel() + "\n"
+                + (layover == null ? "" : "Layover: " + compactDuration(layover) + "\n");
     }
 
     private void openSchedulePicker() {

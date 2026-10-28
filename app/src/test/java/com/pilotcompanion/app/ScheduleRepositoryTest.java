@@ -74,4 +74,9 @@ public class ScheduleRepositoryTest {
         assertEquals("FO",szxAnc.seatPosition());
         assertTrue(szxAnc.isRevised());
     }
+
+    @Test public void calculatesCrewAccessStyleLayoverWindow(){
+        FlightLeg first = repository.forDate(LocalDate.of(2026,9,4)).get(0);
+        assertEquals(18 * 60 + 6, repository.layoverAfter(first).toMinutes());
+    }
 }

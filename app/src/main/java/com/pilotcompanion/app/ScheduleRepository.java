@@ -104,6 +104,26 @@ final class ScheduleRepository {
                 .orElse(null);
     }
 
+    Duration layoverAfter(FlightLeg leg) {
+        if (leg.hotel() == null) return null;
+        FlightLeg next = schedule.values().stream()
+                .flatMap(List::stream)
+                .filter(candidate -> candidate.departure().toInstant().isAfter(leg.arrival().toInstant()))
+                .filter(candidate -> !leg.pairing().isBlank()
+                        ? leg.pairing().equals(candidate.pairing())
+                        : leg.destination().equals(candidate.origin()))
+                .min((a, b) -> a.departure().toInstant().compareTo(b.departure().toInstant()))
+                .orElse(null);
+        if (next == null) return null;
+
+        // Crew Access hotel rows normally run from 30 minutes after block-in until
+        // 90 minutes before the next flight. Keep this distinct from block-to-block time.
+        Duration hotelWindow = Duration.between(
+                leg.arrival().toInstant().plus(30, ChronoUnit.MINUTES),
+                next.departure().toInstant().minus(90, ChronoUnit.MINUTES));
+        return hotelWindow.isNegative() ? null : hotelWindow;
+    }
+
     LocalDate firstScheduledDate() { return schedule.keySet().stream().min(LocalDate::compareTo).orElse(LocalDate.now()); }
     LocalDate nearestScheduledDate(LocalDate target) {
         if (schedule.containsKey(target)) return target;

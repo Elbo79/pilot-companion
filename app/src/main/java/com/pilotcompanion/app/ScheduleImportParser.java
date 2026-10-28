@@ -35,26 +35,28 @@ final class ScheduleImportParser {
         // Roster Details OCR is processed card by card so hotel cards cannot
         // accidentally be consumed as flight data.
         String normalized = normalize(text);
+        // OCR may reorder the "Pos AC Block" headings relative to the route.
+        // Match each timestamped flight card without requiring an exact heading order.
         Pattern roster = Pattern.compile(
-            "(?i)([A-Z]{3}\\s+\\d{1,2}\\s+\\d{1,2}:\\d{2})\\s*-\\s*([A-Z]{3}\\s+\\d{1,2}\\s+\\d{1,2}:\\d{2})" +
-            "\\s+UPS\\s*(\\d{1,4}(?:-\\d)?)\\s+(?:Pos\\s+AC\\s+Block\\s+)?" +
-            "([A-Z]{3})\\s*-\\s*([A-Z]{3})\\s+(R/O|F/O|IRO|FO2|DH)\\b");
+            "(?i)\\\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\\\s+(\\\\d{1,2})\\\\s+(\\\\d{1,2}:\\\\d{2})" +
+            "\\\\s*[-–]\\\\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\\\s+(\\\\d{1,2})\\\\s+(\\\\d{1,2}:\\\\d{2})" +
+            ".{0,100}?UPS\\\\s*(\\\\d{1,4}(?:-\\\\d)?)" +
+            ".{0,110}?\\\\b([A-Z]{3})\\\\s*[-–]\\\\s*([A-Z]{3})\\\\b" +
+            ".{0,65}?\\\\b(R/O|F/O|IRO|FO2|DH)\\\\b");
         Matcher m = roster.matcher(normalized);
         while (m.find()) {
             try {
-                String[] dep = m.group(1).split("\\s+");
-                String[] arr = m.group(2).split("\\s+");
-                String origin = m.group(4).toUpperCase(Locale.US);
-                String destination = m.group(5).toUpperCase(Locale.US);
+                String origin = m.group(8).toUpperCase(Locale.US);
+                String destination = m.group(9).toUpperCase(Locale.US);
                 ZonedDateTime departureUtc = ZonedDateTime.parse(String.format(Locale.US,
-                    "2026-%02d-%02dT%sZ", month(dep[0]), Integer.parseInt(dep[1]), twoDigitTime(dep[2])));
+                    "2026-%02d-%02dT%sZ", month(m.group(1)), Integer.parseInt(m.group(2)), twoDigitTime(m.group(3))));
                 ZonedDateTime arrivalUtc = ZonedDateTime.parse(String.format(Locale.US,
-                    "2026-%02d-%02dT%sZ", month(arr[0]), Integer.parseInt(arr[1]), twoDigitTime(arr[2])));
+                    "2026-%02d-%02dT%sZ", month(m.group(4)), Integer.parseInt(m.group(5)), twoDigitTime(m.group(6))));
                 if (!arrivalUtc.isAfter(departureUtc)) continue;
                 long minutes = java.time.Duration.between(departureUtc,arrivalUtc).toMinutes();
                 if (minutes < 20 || minutes > 1200) continue;
-                result.add(make("UPS"+m.group(3),origin,destination,departureUtc,arrivalUtc,
-                    m.group(6).toUpperCase(Locale.US),requestedType,pairing,null,"Imported UPS Roster Details"));
+                result.add(make("UPS"+m.group(7),origin,destination,departureUtc,arrivalUtc,
+                    m.group(10).toUpperCase(Locale.US),requestedType,pairing,null,"Imported UPS Roster Details"));
             } catch (RuntimeException ignored) { }
         }
         return result;

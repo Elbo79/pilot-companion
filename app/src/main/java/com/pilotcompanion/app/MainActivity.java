@@ -69,7 +69,7 @@ public final class MainActivity extends Activity {
         repository.attach(this);
         importantDates.attach(this);
         restoreLastImport();
-        selectedDate = LocalDate.now();
+        selectedDate = legs.get(0).departure().toLocalDate();
         currentPeriod = PayPeriodCalculator.containing(selectedDate);
         visibleMonth = YearMonth.from(currentPeriod.end());
         setContentView(buildScreen());

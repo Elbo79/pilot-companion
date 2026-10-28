@@ -6,6 +6,8 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -256,14 +258,45 @@ public final class MainActivity extends Activity {
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != IMPORT_REQUEST || resultCode != RESULT_OK || data == null || data.getData() == null) return;
-        Uri uri = data.getData(); String type = getContentResolver().getType(uri);
+        Uri uri = data.getData();
+        String type = getContentResolver().getType(uri);
         try {
             if (type != null && type.startsWith("image/")) {
-                InputImage image = InputImage.fromFilePath(this, uri);
-                TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS).process(image).addOnSuccessListener(result -> chooseImportType(result.getText()))
-                        .addOnFailureListener(error -> Toast.makeText(this, "Could not read schedule image: " + error.getMessage(), Toast.LENGTH_LONG).show());
-            } else chooseImportType(readText(uri));
-        } catch (Exception error) { Toast.makeText(this, "Could not open schedule: " + error.getMessage(), Toast.LENGTH_LONG).show(); }
+                // Decode a bounded image rather than a full-resolution Z Fold screenshot.
+                BitmapFactory.Options bounds = new BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                try (InputStream stream = getContentResolver().openInputStream(uri)) {
+                    BitmapFactory.decodeStream(stream, null, bounds);
+                }
+                int sample = 1;
+                while (bounds.outWidth / sample > 2048 || bounds.outHeight / sample > 2048) sample *= 2;
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inSampleSize = sample;
+                Bitmap bitmap;
+                try (InputStream stream = getContentResolver().openInputStream(uri)) {
+                    bitmap = BitmapFactory.decodeStream(stream, null, options);
+                }
+                if (bitmap == null) throw new IllegalArgumentException("Unsupported image format");
+                var recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+                recognizer.process(InputImage.fromBitmap(bitmap, 0))
+                    .addOnSuccessListener(result -> {
+                        try { chooseImportType(result.getText()); }
+                        catch (RuntimeException error) { importError(error); }
+                    })
+                    .addOnFailureListener(this::importError)
+                    .addOnCompleteListener(task -> { bitmap.recycle(); recognizer.close(); });
+            } else {
+                chooseImportType(readText(uri));
+            }
+        } catch (Exception error) { importError(error); }
+        catch (OutOfMemoryError error) {
+            Toast.makeText(this, "Screenshot too large. Try cropping to the Crew Access table.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void importError(Throwable error) {
+        android.util.Log.e("PilotCompanion", "Schedule import failed", error);
+        Toast.makeText(this, "Import failed. Your existing schedule was not changed.", Toast.LENGTH_LONG).show();
     }
 
     private void chooseImportType(String text) {
@@ -271,7 +304,9 @@ public final class MainActivity extends Activity {
         String[] choices = {"Traded by me (blue)", "Company revised (yellow)", "Original schedule"};
         new AlertDialog.Builder(this).setTitle("How did this schedule change?").setItems(choices, (dialog, which) -> {
             FlightLeg.ChangeType type = which == 0 ? FlightLeg.ChangeType.TRADED : which == 1 ? FlightLeg.ChangeType.REVISED : FlightLeg.ChangeType.ORIGINAL;
-            List<FlightLeg> preview = ScheduleImportParser.parseCrewAccessText(text, type, pairing);
+            List<FlightLeg> preview;
+            try { preview = ScheduleImportParser.parseCrewAccessText(text, type, pairing); }
+            catch (RuntimeException error) { importError(error); return; }
             if (preview.isEmpty()) {
                 new AlertDialog.Builder(this).setTitle("No flights recognized")
                     .setMessage("This screenshot did not contain recognizable Crew Access flight rows. Try a full-resolution screenshot showing Trip Id, the flight numbers, routes, and both Zulu columns. No schedule was changed.")
@@ -293,6 +328,7 @@ public final class MainActivity extends Activity {
     }
 
     private void importText(String text, FlightLeg.ChangeType requestedType, String pairing, boolean persist) {
+        try {
         List<FlightLeg> legs = ScheduleImportParser.parseCrewAccessText(text, requestedType, pairing);
         if (legs.isEmpty()) { Toast.makeText(this, "I could not find Crew Access flight cards in that file yet.", Toast.LENGTH_LONG).show(); return; }
         Instant firstDeparture = legs.stream().map(l -> l.departure().toInstant()).min(Instant::compareTo).orElse(Instant.MAX);
@@ -304,6 +340,7 @@ public final class MainActivity extends Activity {
         currentPeriod = PayPeriodCalculator.containing(selectedDate);
         visibleMonth = YearMonth.from(currentPeriod.end());
         showMonth(); showDay(selectedDate); Toast.makeText(this, "Schedule imported: " + legs.size() + " flights", Toast.LENGTH_SHORT).show();
+        } catch (RuntimeException error) { importError(error); }
     }
 
     private void restoreLastImport() {

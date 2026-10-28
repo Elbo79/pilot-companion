@@ -70,7 +70,20 @@ final class PilotDatabase extends SQLiteOpenHelper {
     }
     void saveFlights(List<FlightLeg> flights) {
         SQLiteDatabase db=getWritableDatabase();db.beginTransaction();
-        try{for(FlightLeg leg:flights)insert(db,leg);db.setTransactionSuccessful();}finally{db.endTransaction();}
+        try{
+            for(FlightLeg leg:flights){
+                if(leg.changeType()==FlightLeg.ChangeType.REVISED){
+                    // A revised departure can shift to another calendar date.
+                    // Replace matching flight/route within four days, but not unrelated legs.
+                    String from=leg.departure().toInstant().minus(java.time.Duration.ofDays(4)).toString();
+                    String to=leg.departure().toInstant().plus(java.time.Duration.ofDays(4)).toString();
+                    db.delete("flights","flight=? AND origin=? AND destination=? AND departure>=? AND departure<=?",
+                        new String[]{leg.flightNumber(),leg.origin(),leg.destination(),from,to});
+                }
+                insert(db,leg);
+            }
+            db.setTransactionSuccessful();
+        }finally{db.endTransaction();}
     }
     List<FlightLeg> loadFlights() {
         List<FlightLeg> list=new ArrayList<>();

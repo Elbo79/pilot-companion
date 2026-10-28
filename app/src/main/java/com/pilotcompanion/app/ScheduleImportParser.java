@@ -38,11 +38,11 @@ final class ScheduleImportParser {
         // OCR may reorder the "Pos AC Block" headings relative to the route.
         // Match each timestamped flight card without requiring an exact heading order.
         Pattern roster = Pattern.compile(
-            "(?i)\\\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\\\s+(\\\\d{1,2})\\\\s+(\\\\d{1,2}:\\\\d{2})" +
-            "\\\\s*[-–]\\\\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\\\s+(\\\\d{1,2})\\\\s+(\\\\d{1,2}:\\\\d{2})" +
-            ".{0,100}?UPS\\\\s*(\\\\d{1,4}(?:-\\\\d)?)" +
-            ".{0,110}?\\\\b([A-Z]{3})\\\\s*[-–]\\\\s*([A-Z]{3})\\\\b" +
-            ".{0,65}?\\\\b(R/O|F/O|IRO|FO2|DH)\\\\b");
+            "(?i)\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+(\\d{1,2})\\s+(\\d{1,2}:\\d{2})" +
+            "\\s*[-–]\\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+(\\d{1,2})\\s+(\\d{1,2}:\\d{2})" +
+            ".{0,100}?UPS\\s*(\\d{1,4}(?:-\\d)?)" +
+            ".{0,110}?\\b([A-Z]{3})\\s*[-–]\\s*([A-Z]{3})\\b" +
+            ".{0,65}?\\b(R/O|F/O|IRO|FO2|DH)\\b");
         Matcher m = roster.matcher(normalized);
         while (m.find()) {
             try {

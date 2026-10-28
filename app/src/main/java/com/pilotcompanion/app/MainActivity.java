@@ -127,6 +127,19 @@ public final class MainActivity extends Activity {
         calendar.setPeriod(currentPeriod);
         calendar.setSelectedDate(selectedDate);
         calendar.setOnDateSelectedListener(this::showDay);
+        calendar.setDayStatuses(new PilotDatabase(this).loadDayStatuses());
+        calendar.setOnDateLongPressedListener(date -> {
+            String[] options = {"Vacation (green)", "Sick (red)", "Clear marker"};
+            new AlertDialog.Builder(this).setTitle("Mark " + date)
+                .setItems(options, (dialog, choice) -> {
+                    try {
+                        new PilotDatabase(this).setDayStatus(date, choice == 0 ? "VACATION" : choice == 1 ? "SICK" : null);
+                        calendar.setDayStatuses(new PilotDatabase(this).loadDayStatuses());
+                        showDay(date);
+                    } catch (RuntimeException error) { importError(error); }
+                }).show();
+        });
+
         calendarArea = new LinearLayout(this);
         calendarArea.setOrientation(wideLayout ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
         root.addView(calendarArea, new LinearLayout.LayoutParams(-1, 0, 1));

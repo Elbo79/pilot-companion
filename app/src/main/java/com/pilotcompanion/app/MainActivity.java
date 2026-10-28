@@ -321,8 +321,10 @@ public final class MainActivity extends Activity {
             try { preview = ScheduleImportParser.parseCrewAccessText(text, type, pairing); }
             catch (RuntimeException error) { importError(error); return; }
             if (preview.isEmpty()) {
+                android.util.Log.w("PilotCompanion", "OCR completed, but parser found zero flights. Characters: " + text.length());
+                String sample = text.length() > 1800 ? text.substring(0, 1800) + "\\n[truncated]" : text;
                 new AlertDialog.Builder(this).setTitle("No flights recognized")
-                    .setMessage("This screenshot did not contain recognizable Crew Access flight rows. Try a full-resolution screenshot showing Trip Id, the flight numbers, routes, and both Zulu columns. No schedule was changed.")
+                    .setMessage("Text recognition completed (" + text.length() + " characters), but no flight rows matched. Your schedule was not changed.\\n\\nRecognized text for troubleshooting:\\n" + sample)
                     .setPositiveButton("OK", null).show();
                 return;
             }

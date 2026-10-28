@@ -13,13 +13,14 @@ import java.util.*;
 
 final class PilotDatabase extends SQLiteOpenHelper {
     private final Context context;
-    PilotDatabase(Context context) { super(context, "pilot_schedule.db", null, 2); this.context=context.getApplicationContext(); }
+    PilotDatabase(Context context) { super(context, "pilot_schedule.db", null, 3); this.context=context.getApplicationContext(); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE flights (identity TEXT PRIMARY KEY, flight TEXT NOT NULL, origin TEXT NOT NULL, destination TEXT NOT NULL, departure TEXT NOT NULL, arrival TEXT NOT NULL, scheduled_departure TEXT NOT NULL, scheduled_arrival TEXT NOT NULL, assignment TEXT, source TEXT, hotel TEXT, change_type TEXT, pairing TEXT)");
         db.execSQL("CREATE INDEX idx_flights_departure ON flights(departure)");
         db.execSQL("CREATE TABLE important_dates (identity TEXT PRIMARY KEY, date TEXT NOT NULL, time TEXT, title TEXT NOT NULL, type TEXT NOT NULL, deadline INTEGER NOT NULL, source TEXT)");
         seed(db);
         seedNovember(db);
+        db.execSQL("CREATE TABLE day_status (date TEXT PRIMARY KEY, status TEXT NOT NULL)");
     }
     @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion) {
         if(oldVersion<2){
@@ -27,6 +28,7 @@ final class PilotDatabase extends SQLiteOpenHelper {
             db.delete("important_dates","date=? AND title=?",new String[]{"2026-11-19","Line 159 • Trip 354"});
             seedNovember(db);
         }
+        if(oldVersion<3)db.execSQL("CREATE TABLE IF NOT EXISTS day_status (date TEXT PRIMARY KEY, status TEXT NOT NULL)");
     }
     private void seedNovember(SQLiteDatabase db){
         try{
@@ -93,4 +95,18 @@ final class PilotDatabase extends SQLiteOpenHelper {
             while(c.moveToNext())list.add(new ImportantDate(LocalDate.parse(c.getString(0)),c.isNull(1)?null:LocalTime.parse(c.getString(1)),c.getString(2),ImportantDate.Type.valueOf(c.getString(3)),c.getInt(4)!=0,c.getString(5)));
         }return list;
     }
+    Map<LocalDate,String> loadDayStatuses(){
+        Map<LocalDate,String> out=new HashMap<>();
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT date,status FROM day_status",null)){
+            while(c.moveToNext())out.put(LocalDate.parse(c.getString(0)),c.getString(1));
+        }
+        return out;
+    }
+    void setDayStatus(LocalDate date,String status){
+        SQLiteDatabase db=getWritableDatabase();
+        if(status==null){db.delete("day_status","date=?",new String[]{date.toString()});return;}
+        ContentValues v=new ContentValues();v.put("date",date.toString());v.put("status",status);
+        db.insertWithOnConflict("day_status",null,v,SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
 }

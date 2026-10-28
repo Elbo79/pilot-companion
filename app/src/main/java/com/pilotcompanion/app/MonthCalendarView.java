@@ -12,6 +12,8 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.function.Consumer;
 
@@ -21,6 +23,12 @@ final class MonthCalendarView extends View {
     private final ImportantDateRepository importantDates;
     private PayPeriodCalculator.Period period = PayPeriodCalculator.containing(LocalDate.now());
     private LocalDate selected;
+    private Map<LocalDate,String> dayStatuses = new HashMap<>();
+    private Consumer<LocalDate> longPressListener = ignored -> {};
+    private final android.os.Handler pressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private boolean longPressed = false;
+    private float downX, downY;
+    private final Runnable longPress = () -> { longPressed = true; longPressListener.accept(dateAt(downX,downY)); };
     private Consumer<LocalDate> listener = ignored -> { };
 
     MonthCalendarView(Context context, ScheduleRepository repository, ImportantDateRepository importantDates) {
@@ -31,6 +39,8 @@ final class MonthCalendarView extends View {
         paint.setTypeface(Typeface.create("sans", Typeface.NORMAL));
     }
 
+    void setDayStatuses(Map<LocalDate,String> statuses) { dayStatuses = new HashMap<>(statuses); invalidate(); }
+    void setOnDateLongPressedListener(Consumer<LocalDate> listener) { longPressListener = listener; }
     void setMonth(YearMonth month) {
         this.period = PayPeriodCalculator.containing(month.atEndOfMonth());
         invalidate();
@@ -73,6 +83,11 @@ final class MonthCalendarView extends View {
             paint.setColor((date.getMonthValue() % 2 == 0) ? 0xFF0C2942 : 0xFF102F4B);
             canvas.drawRect(left + dp(1), top + dp(1), right - dp(1), bottom - dp(1), paint);
 
+            String dayStatus = dayStatuses.get(date);
+            if ("VACATION".equals(dayStatus) || "SICK".equals(dayStatus)) {
+                paint.setColor("VACATION".equals(dayStatus) ? 0xFF176B3A : 0xFF9A2732);
+                canvas.drawRoundRect(left + dp(2), top + dp(2), right - dp(2), bottom - dp(2), dp(7), dp(7), paint);
+            }
             if (date.equals(LocalDate.now())) {
                 paint.setColor(0xFF1F5A78);
                 canvas.drawRoundRect(left + dp(2), top + dp(2), right - dp(2), bottom - dp(2), dp(9), dp(9), paint);
@@ -102,6 +117,10 @@ final class MonthCalendarView extends View {
             canvas.drawText(dateLabel, left + dp(5), top + dp(17), paint);
 
             float y = top + dp(33);
+            if(dayStatus != null) {
+                paint.setColor(Color.WHITE); paint.setTextSize(dp(8));
+                canvas.drawText(dayStatus.equals("VACATION") ? "VACATION" : "SICK", left + dp(4), y, paint); y += dp(11);
+            }
             var legs = repository.forDate(date);
             if (!legs.isEmpty()) {
                 FlightLeg leg = legs.get(0);
@@ -150,18 +169,26 @@ final class MonthCalendarView extends View {
 
     private String shortLabel(String text, int max) { return text.length() <= max ? text : text.substring(0, max - 1) + "…"; }
 
-    @Override public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() != MotionEvent.ACTION_UP) return true;
-        float header = dp(28);
-        if (event.getY() < header) return true;
-        int column = Math.min(6, (int) (event.getX() / (getWidth() / 7f)));
-        int row = Math.min(3, (int) ((event.getY() - header) / ((getHeight() - header) / 4f)));
-        int index = row * 7 + column;
-        if (index >= 0 && index < 28) {
-            selected = period.start().plusDays(index);
-            listener.accept(selected);
-            invalidate();
-            performClick();
+    private LocalDate dateAt(float x,float y){
+        int column=Math.max(0,Math.min(6,(int)(x/(getWidth()/7f))));
+        int row=Math.max(0,Math.min(3,(int)((y-dp(28))/((getHeight()-dp(28))/4f))));
+        return period.start().plusDays(row*7L+column);
+    }
+    @Override public boolean onTouchEvent(MotionEvent event){
+        switch(event.getActionMasked()){
+            case MotionEvent.ACTION_DOWN:
+                downX=event.getX();downY=event.getY();longPressed=false;
+                if(downY>=dp(28))pressHandler.postDelayed(longPress,550);
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                if(Math.abs(event.getX()-downX)>dp(15)||Math.abs(event.getY()-downY)>dp(15))pressHandler.removeCallbacks(longPress);
+                return true;
+            case MotionEvent.ACTION_CANCEL:
+                pressHandler.removeCallbacks(longPress);return true;
+            case MotionEvent.ACTION_UP:
+                pressHandler.removeCallbacks(longPress);
+                if(!longPressed && event.getY()>=dp(28)){selected=dateAt(event.getX(),event.getY());listener.accept(selected);invalidate();performClick();}
+                return true;
         }
         return true;
     }

@@ -32,20 +32,30 @@ final class ScheduleImportParser {
         List<FlightLeg> result = parseTripInformation(text, requestedType, pairing);
         if (!result.isEmpty()) return result;
 
+        // Roster Details OCR is processed card by card so hotel cards cannot
+        // accidentally be consumed as flight data.
         String normalized = normalize(text);
-        Matcher m = CREW_ACCESS_CARD.matcher(normalized);
+        Pattern roster = Pattern.compile(
+            "(?i)([A-Z]{3}\\s+\\d{1,2}\\s+\\d{1,2}:\\d{2})\\s*-\\s*([A-Z]{3}\\s+\\d{1,2}\\s+\\d{1,2}:\\d{2})" +
+            "\\s+UPS\\s*(\\d{1,4}(?:-\\d)?)\\s+(?:Pos\\s+AC\\s+Block\\s+)?" +
+            "([A-Z]{3})\\s*-\\s*([A-Z]{3})\\s+(R/O|F/O|IRO|FO2|DH)\\b");
+        Matcher m = roster.matcher(normalized);
         while (m.find()) {
-            int depMonth = month(m.group(1));
-            int depDay = Integer.parseInt(m.group(2));
-            int arrMonth = month(m.group(4));
-            int arrDay = Integer.parseInt(m.group(5));
-            String flight = "UPS" + m.group(7);
-            String origin = m.group(8).toUpperCase(Locale.US);
-            String destination = m.group(9).toUpperCase(Locale.US);
-            String assignment = m.group(10).toUpperCase(Locale.US);
-            ZonedDateTime departureUtc = ZonedDateTime.parse(String.format(Locale.US, "2026-%02d-%02dT%sZ", depMonth, depDay, twoDigitTime(m.group(3))));
-            ZonedDateTime arrivalUtc = ZonedDateTime.parse(String.format(Locale.US, "2026-%02d-%02dT%sZ", arrMonth, arrDay, twoDigitTime(m.group(6))));
-            result.add(make(flight, origin, destination, departureUtc, arrivalUtc, assignment, requestedType, pairing, null, "Imported Crew Access card"));
+            try {
+                String[] dep = m.group(1).split("\\s+");
+                String[] arr = m.group(2).split("\\s+");
+                String origin = m.group(4).toUpperCase(Locale.US);
+                String destination = m.group(5).toUpperCase(Locale.US);
+                ZonedDateTime departureUtc = ZonedDateTime.parse(String.format(Locale.US,
+                    "2026-%02d-%02dT%sZ", month(dep[0]), Integer.parseInt(dep[1]), twoDigitTime(dep[2])));
+                ZonedDateTime arrivalUtc = ZonedDateTime.parse(String.format(Locale.US,
+                    "2026-%02d-%02dT%sZ", month(arr[0]), Integer.parseInt(arr[1]), twoDigitTime(arr[2])));
+                if (!arrivalUtc.isAfter(departureUtc)) continue;
+                long minutes = java.time.Duration.between(departureUtc,arrivalUtc).toMinutes();
+                if (minutes < 20 || minutes > 1200) continue;
+                result.add(make("UPS"+m.group(3),origin,destination,departureUtc,arrivalUtc,
+                    m.group(6).toUpperCase(Locale.US),requestedType,pairing,null,"Imported UPS Roster Details"));
+            } catch (RuntimeException ignored) { }
         }
         return result;
     }

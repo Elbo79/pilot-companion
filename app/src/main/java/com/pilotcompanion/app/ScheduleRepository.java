@@ -17,8 +17,11 @@ final class ScheduleRepository {
         mergeInMemory(database.loadFlights());
     }
     void mergeImported(List<FlightLeg> imported){
-        if(database!=null)database.saveFlights(imported);
-        mergeInMemory(imported);
+        if(database!=null){
+            database.saveFlights(imported);
+            schedule.clear();
+            mergeInMemory(database.loadFlights());
+        } else mergeInMemory(imported);
     }
     private void mergeInMemory(List<FlightLeg> imported){
         for(FlightLeg leg:imported){

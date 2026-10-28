@@ -32,31 +32,48 @@ final class ScheduleImportParser {
         List<FlightLeg> result = parseTripInformation(text, requestedType, pairing);
         if (!result.isEmpty()) return result;
 
-        // Roster Details OCR is processed card by card so hotel cards cannot
-        // accidentally be consumed as flight data.
+        // Roster flight cards contain UTC timestamps; local clocks are derived by make().
+        // Match each card independently, so hotel rows and reordered OCR labels cannot
+        // consume the next flight. ML Kit sometimes emits "Pos AC Block" before the route.
         String normalized = normalize(text);
-        // OCR may reorder the "Pos AC Block" headings relative to the route.
-        // Match each timestamped flight card without requiring an exact heading order.
-        Pattern roster = Pattern.compile(
-            "(?i)\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+(\\d{1,2})\\s+(\\d{1,2}:\\d{2})" +
-            "\\s*[-–]\\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+(\\d{1,2})\\s+(\\d{1,2}:\\d{2})" +
-            ".{0,100}?UPS\\s*(\\d{1,4}(?:-\\d)?)" +
-            ".{0,110}?\\b([A-Z]{3})\\s*[-–]\\s*([A-Z]{3})\\b" +
-            ".{0,65}?\\b(R/O|F/O|IRO|FO2|DH)\\b");
-        Matcher m = roster.matcher(normalized);
-        while (m.find()) {
+        Pattern cardStart = Pattern.compile(
+            "(?i)\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+" +
+            "(\\d{1,2})\\s+(\\d{1,2}:\\d{2})\\s*[-–]\\s*" +
+            "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+" +
+            "(\\d{1,2})\\s+(\\d{1,2}:\\d{2})\\b");
+        Pattern flightNumber = Pattern.compile("(?i)\\bUPS\\s*0*(\\d{1,4}(?:-\\d)?)\\b");
+        Pattern routePattern = Pattern.compile("(?i)\\b([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})\\b");
+        Pattern seatPattern = Pattern.compile("(?i)\\b(R/O|F/O|IRO|FO2|DH)\\b");
+        Matcher cards = cardStart.matcher(normalized);
+        List<int[]> ranges = new ArrayList<>();
+        while (cards.find()) ranges.add(new int[]{cards.start(), cards.end()});
+        for (int i = 0; i < ranges.size(); i++) {
+            int[] range = ranges.get(i);
+            String card = normalized.substring(range[1],
+                Math.min(normalized.length(), Math.min(range[1] + 240,
+                    i + 1 < ranges.size() ? ranges.get(i + 1)[0] : normalized.length())));
+            Matcher flight = flightNumber.matcher(card);
+            Matcher route = routePattern.matcher(card);
+            Matcher seat = seatPattern.matcher(card);
+            if (!flight.find() || !route.find()) continue; // Hotel card, not a flight.
             try {
-                String origin = m.group(8).toUpperCase(Locale.US);
-                String destination = m.group(9).toUpperCase(Locale.US);
+                Matcher dates = cardStart.matcher(normalized.substring(range[0], range[1]));
+                if (!dates.find()) continue;
+                String origin = route.group(1).toUpperCase(Locale.US);
+                String destination = route.group(2).toUpperCase(Locale.US);
+                int year = 2026; // Roster screenshots do not carry a year; see import preview.
                 ZonedDateTime departureUtc = ZonedDateTime.parse(String.format(Locale.US,
-                    "2026-%02d-%02dT%sZ", month(m.group(1)), Integer.parseInt(m.group(2)), twoDigitTime(m.group(3))));
+                    "%04d-%02d-%02dT%sZ", year, month(dates.group(1)),
+                    Integer.parseInt(dates.group(2)), twoDigitTime(dates.group(3))));
                 ZonedDateTime arrivalUtc = ZonedDateTime.parse(String.format(Locale.US,
-                    "2026-%02d-%02dT%sZ", month(m.group(4)), Integer.parseInt(m.group(5)), twoDigitTime(m.group(6))));
-                if (!arrivalUtc.isAfter(departureUtc)) continue;
-                long minutes = java.time.Duration.between(departureUtc,arrivalUtc).toMinutes();
+                    "%04d-%02d-%02dT%sZ", year, month(dates.group(4)),
+                    Integer.parseInt(dates.group(5)), twoDigitTime(dates.group(6))));
+                long minutes = java.time.Duration.between(departureUtc, arrivalUtc).toMinutes();
                 if (minutes < 20 || minutes > 1200) continue;
-                result.add(make("UPS"+m.group(7),origin,destination,departureUtc,arrivalUtc,
-                    m.group(10).toUpperCase(Locale.US),requestedType,pairing,null,"Imported UPS Roster Details"));
+                String assignment = seat.find() ? seat.group(1).toUpperCase(Locale.US) : "F/O";
+                result.add(make("UPS" + flight.group(1), origin, destination,
+                    departureUtc, arrivalUtc, assignment, requestedType, pairing,
+                    null, "Imported UPS Roster Details (UTC)"));
             } catch (RuntimeException ignored) { }
         }
         return result;

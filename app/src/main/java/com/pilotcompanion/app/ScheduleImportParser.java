@@ -75,7 +75,7 @@ final class ScheduleImportParser {
                     departureUtc, arrivalUtc, assignment, requestedType, pairing,
                     null, "Imported UPS Roster Details (UTC)"));
             } catch (RuntimeException error) {
-                android.util.Log.w("PilotCompanion", "Skipping invalid Roster flight card", error);
+                System.err.println("Roster parse skipped card: " + error);
             }
         }
         return result;

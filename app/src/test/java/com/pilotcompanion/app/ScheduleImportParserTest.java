@@ -80,4 +80,27 @@ public class ScheduleImportParserTest {
         assertEquals("DH",legs.get(1).seatPosition());
     }
 
+    @Test public void parsesActualRosterFlightCardsAndSkipsHotels() {
+        String text = "Roster Details " +
+            "Oct 26 19:11 - Oct 27 07:12 UPS96 Pos AC Block ANC - CRK R/O 747 12:01h " +
+            "Oct 27 07:42 - Oct 29 07:20 CRK - Clark Marriott Hotel 47:38h " +
+            "Oct 29 08:20 - Oct 29 10:03 UPS95 Pos AC Block CRK - TPE F/O 747 1:43h " +
+            "Oct 29 10:33 - Oct 30 11:00 TPE - Sheraton Taipei 24:27h " +
+            "Oct 30 12:30 - Oct 30 21:10 UPS95 Pos AC Block TPE - ANC F/O 747 8:40h";
+        List<FlightLeg> legs = ScheduleImportParser.parseCrewAccessText(
+            text, FlightLeg.ChangeType.REVISED, "A70233R");
+        assertEquals(3, legs.size());
+        assertEquals("UPS96", legs.get(0).flightNumber());
+        assertEquals("R/O", legs.get(0).seatPosition());
+        assertEquals("Oct 29 08:20Z", legs.get(1).departureZulu());
+        assertEquals("Oct 30 12:30Z", legs.get(2).departureZulu());
+        assertEquals("A70233R", legs.get(2).pairing());
+    }
+
+    @Test public void rosterDoesNotConfuseHotelWithFlight() {
+        String text = "Oct 27 07:42 - Oct 29 07:20 CRK - Clark Marriott Hotel 47:38h";
+        assertEquals(0, ScheduleImportParser.parseCrewAccessText(
+            text, FlightLeg.ChangeType.REVISED, "").size());
+    }
+
 }

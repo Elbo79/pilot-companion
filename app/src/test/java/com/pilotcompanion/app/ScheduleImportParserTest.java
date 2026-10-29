@@ -91,7 +91,7 @@ public class ScheduleImportParserTest {
             text, FlightLeg.ChangeType.REVISED, "A70233R");
         assertEquals(3, legs.size());
         assertEquals("UPS96", legs.get(0).flightNumber());
-        assertEquals("R/O", legs.get(0).seatPosition());
+        assertEquals("RO", legs.get(0).seatPosition());
         assertEquals("Oct 29 08:20Z", legs.get(1).departureZulu());
         assertEquals("Oct 30 12:30Z", legs.get(2).departureZulu());
         assertEquals("A70233R", legs.get(2).pairing());

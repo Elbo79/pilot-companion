@@ -282,7 +282,7 @@ public final class MainActivity extends Activity {
                     BitmapFactory.decodeStream(stream, null, bounds);
                 }
                 int sample = 1;
-                while (bounds.outWidth / sample > 2048 || bounds.outHeight / sample > 2048) sample *= 2;
+                while (bounds.outWidth / sample > 4096 || bounds.outHeight / sample > 4096) sample *= 2;
                 BitmapFactory.Options options = new BitmapFactory.Options();
                 options.inSampleSize = sample;
                 Bitmap bitmap;
@@ -290,6 +290,7 @@ public final class MainActivity extends Activity {
                     bitmap = BitmapFactory.decodeStream(stream, null, options);
                 }
                 if (bitmap == null) throw new IllegalArgumentException("Unsupported image format");
+                Toast.makeText(this, "Reading screenshot…", Toast.LENGTH_SHORT).show();
                 var recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
                 recognizer.process(InputImage.fromBitmap(bitmap, 0))
                     .addOnSuccessListener(result -> {
@@ -322,9 +323,9 @@ public final class MainActivity extends Activity {
             catch (RuntimeException error) { importError(error); return; }
             if (preview.isEmpty()) {
                 android.util.Log.w("PilotCompanion", "OCR completed, but parser found zero flights. Characters: " + text.length());
-                String sample = text.length() > 1800 ? text.substring(0, 1800) + "\\n[truncated]" : text;
+                String sample = text.length() > 1800 ? text.substring(0, 1800) + "\n[truncated]" : text;
                 new AlertDialog.Builder(this).setTitle("No flights recognized")
-                    .setMessage("Text recognition completed (" + text.length() + " characters), but no flight rows matched. Your schedule was not changed.\\n\\nRecognized text for troubleshooting:\\n" + sample)
+                    .setMessage("Text recognition completed (" + text.length() + " characters), but no flight rows matched. Your schedule was not changed.\n\nRecognized text for troubleshooting:\n" + sample)
                     .setPositiveButton("OK", null).show();
                 return;
             }

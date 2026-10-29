@@ -29,7 +29,7 @@ final class ScheduleImportParser {
     private static final Pattern CLOCK = Pattern.compile("\\b(\\d{1,2}:\\d{2})\\b");
 
     static List<FlightLeg> parseCrewAccessText(String text, FlightLeg.ChangeType requestedType, String pairing) {
-        List<FlightLeg> result = parseTripInformation(text, requestedType, pairing);
+        List<FlightLeg> result = new ArrayList<>(parseTripInformation(text, requestedType, pairing));
         if (!result.isEmpty()) return result;
 
         // Roster flight cards contain UTC timestamps; local clocks are derived by make().
@@ -74,9 +74,7 @@ final class ScheduleImportParser {
                 result.add(make("UPS" + flight.group(1), origin, destination,
                     departureUtc, arrivalUtc, assignment, requestedType, pairing,
                     null, "Imported UPS Roster Details (UTC)"));
-            } catch (RuntimeException error) {
-                System.err.println("Roster parse skipped card: " + error);
-            }
+            } catch (RuntimeException ignored) { }
         }
         return result;
     }

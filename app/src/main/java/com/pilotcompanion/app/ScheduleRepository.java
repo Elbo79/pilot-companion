@@ -27,6 +27,46 @@ final class ScheduleRepository {
             mergeInMemory(imported);
         }
     }
+    // Start replacement at the old departure from the same airport, even when
+    // the revised departure moves to the following day. Keep completed legs.
+    Instant revisionCutoff(List<FlightLeg> incoming, String pairing) {
+        if (incoming.isEmpty()) throw new IllegalArgumentException("No revised flights");
+        List<FlightLeg> old = flightsForPairing(pairing);
+        Instant first = incoming.stream().map(l -> l.departure().toInstant())
+            .min(Instant::compareTo).orElseThrow();
+        FlightLeg anchor = null;
+        long best = Long.MAX_VALUE;
+        for (FlightLeg fresh : incoming) for (FlightLeg previous : old) {
+            long delta = Math.abs(Duration.between(previous.departure().toInstant(),
+                fresh.departure().toInstant()).toHours());
+            if (previous.origin().equals(fresh.origin()) && delta <= 72 && delta < best
+                && previous.departure().toInstant().isAfter(Instant.now())) {
+                best = delta;
+                anchor = previous;
+            }
+        }
+        if (anchor == null) throw new IllegalArgumentException(
+            "No future departure from the same airport within 72 hours. Review manually.");
+        return anchor.departure().toInstant();
+    }
+    List<FlightLeg> supersededLegs(String pairing, Instant cutoff) {
+        List<FlightLeg> out = new ArrayList<>();
+        for (FlightLeg old : flightsForPairing(pairing))
+            if (!old.departure().toInstant().isBefore(cutoff)) out.add(old);
+        return out;
+    }
+    void replaceRemainingTrip(List<FlightLeg> incoming, String pairing, Instant cutoff) {
+        if (database != null) {
+            database.replaceRemainingTrip(incoming, pairing, cutoff);
+            schedule.clear();
+            mergeInMemory(database.loadFlights());
+        } else {
+            for (List<FlightLeg> day : schedule.values())
+                day.removeIf(l -> pairing.equals(l.pairing()) &&
+                    !l.departure().toInstant().isBefore(cutoff));
+            mergeInMemory(incoming);
+        }
+    }
     List<String> allPairings() {
         Set<String> names = new TreeSet<>();
         for (List<FlightLeg> day : schedule.values()) for (FlightLeg leg : day)

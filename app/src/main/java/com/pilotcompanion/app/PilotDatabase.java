@@ -68,11 +68,15 @@ final class PilotDatabase extends SQLiteOpenHelper {
         v.put("assignment",leg.assignment());v.put("source",leg.source());v.put("hotel",leg.hotel());v.put("change_type",leg.changeType().name());v.put("pairing",leg.pairing());
         db.insertWithOnConflict("flights",null,v,SQLiteDatabase.CONFLICT_REPLACE);
     }
-    void saveFlights(List<FlightLeg> flights) {
+    void saveFlights(List<FlightLeg> flights) { saveFlights(flights, null); }
+    void saveFlights(List<FlightLeg> flights, String replacedPairing) {
         SQLiteDatabase db=getWritableDatabase();db.beginTransaction();
         try{
+            if (replacedPairing != null && !replacedPairing.isBlank()) {
+                db.delete("flights", "pairing=?", new String[]{replacedPairing});
+            }
             for(FlightLeg leg:flights){
-                if(leg.changeType()==FlightLeg.ChangeType.REVISED){
+                if(replacedPairing == null && leg.changeType()==FlightLeg.ChangeType.REVISED){
                     // A revised departure can shift to another calendar date.
                     // Replace matching flight/route within four days, but not unrelated legs.
                     String from=leg.departure().toInstant().minus(java.time.Duration.ofDays(4)).toString();

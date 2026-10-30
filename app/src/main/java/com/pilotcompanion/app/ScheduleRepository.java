@@ -67,6 +67,28 @@ final class ScheduleRepository {
             mergeInMemory(incoming);
         }
     }
+    List<FlightLeg> candidateLegs(List<FlightLeg> incoming) {
+        if (incoming.isEmpty()) return List.of();
+        Instant first = incoming.stream().map(l -> l.departure().toInstant())
+            .min(Instant::compareTo).orElseThrow();
+        Instant last = incoming.stream().map(l -> l.arrival().toInstant())
+            .max(Instant::compareTo).orElseThrow();
+        List<FlightLeg> matches = new ArrayList<>();
+        for (List<FlightLeg> day : schedule.values()) for (FlightLeg old : day) {
+            Instant when = old.departure().toInstant();
+            if (!when.isBefore(first.minus(4, ChronoUnit.DAYS))
+                && !when.isAfter(last.plus(4, ChronoUnit.DAYS)))
+                matches.add(old);
+        }
+        matches.sort(Comparator.comparing(l -> l.departure().toInstant()));
+        return matches;
+    }
+    void replaceSelectedLegs(List<FlightLeg> incoming, List<FlightLeg> superseded) {
+        if (database == null) throw new IllegalStateException("Schedule database unavailable");
+        database.replaceSelectedLegs(incoming, superseded);
+        schedule.clear();
+        mergeInMemory(database.loadFlights());
+    }
     List<String> allPairings() {
         Set<String> names = new TreeSet<>();
         for (List<FlightLeg> day : schedule.values()) for (FlightLeg leg : day)

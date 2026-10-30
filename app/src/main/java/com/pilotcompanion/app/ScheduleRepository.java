@@ -16,12 +16,28 @@ final class ScheduleRepository {
         schedule.clear();
         mergeInMemory(database.loadFlights());
     }
-    void mergeImported(List<FlightLeg> imported){
+    void mergeImported(List<FlightLeg> imported){ mergeReplacing(imported, null); }
+    void mergeReplacing(List<FlightLeg> imported, String replacedPairing){
         if(database!=null){
-            database.saveFlights(imported);
+            database.saveFlights(imported, replacedPairing);
             schedule.clear();
             mergeInMemory(database.loadFlights());
-        } else mergeInMemory(imported);
+        } else {
+            if (replacedPairing != null) for (List<FlightLeg> existing : schedule.values()) existing.removeIf(l -> replacedPairing.equals(l.pairing()));
+            mergeInMemory(imported);
+        }
+    }
+    List<String> candidatePairings(List<FlightLeg> incoming) {
+        if (incoming.isEmpty()) return List.of();
+        Instant first = incoming.stream().map(l -> l.departure().toInstant()).min(Instant::compareTo).orElseThrow();
+        Instant last = incoming.stream().map(l -> l.arrival().toInstant()).max(Instant::compareTo).orElseThrow();
+        Set<String> matches = new TreeSet<>();
+        for (List<FlightLeg> day : schedule.values()) for (FlightLeg old : day) {
+            if (old.pairing() != null && !old.pairing().isBlank()
+                && !old.departure().toInstant().isAfter(last.plus(4, ChronoUnit.DAYS))
+                && !old.arrival().toInstant().isBefore(first.minus(4, ChronoUnit.DAYS))) matches.add(old.pairing());
+        }
+        return new ArrayList<>(matches);
     }
     private void mergeInMemory(List<FlightLeg> imported){
         for(FlightLeg leg:imported){

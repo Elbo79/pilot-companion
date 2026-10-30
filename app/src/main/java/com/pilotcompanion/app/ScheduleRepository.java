@@ -40,7 +40,7 @@ final class ScheduleRepository {
             long delta = Math.abs(Duration.between(previous.departure().toInstant(),
                 fresh.departure().toInstant()).toHours());
             if (previous.origin().equals(fresh.origin()) && delta <= 72 && delta < best
-                && previous.departure().toInstant().isAfter(Instant.now())) {
+) {
                 best = delta;
                 anchor = previous;
             }

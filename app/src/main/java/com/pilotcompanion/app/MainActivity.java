@@ -37,6 +37,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -376,61 +377,61 @@ public final class MainActivity extends Activity {
     }
 
     private void chooseReplacement(String text, FlightLeg.ChangeType type, String pairing, List<FlightLeg> preview) {
-        List<String> candidates = repository.candidatePairings(preview);
+        List<FlightLeg> candidates = repository.candidateLegs(preview);
         if (candidates.isEmpty()) {
-            new AlertDialog.Builder(this).setTitle("No existing pairing found")
-                .setMessage("No existing trip was found near these dates. Importing will add flights, not replace any. Continue only if this is a new trip.")
+            new AlertDialog.Builder(this).setTitle("No existing flights found")
+                .setMessage("No saved flights are near the imported dates. This will ADD flights only. Verify this is a new trip.")
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Add new trip", (d, w) -> importText(text, type, pairing, true, null))
+                .setPositiveButton("Add new flights", (d, w) -> importText(text, type, pairing, true, null))
                 .show();
             return;
         }
-        String[] options = new String[candidates.size() + 1];
-        for (int i = 0; i < candidates.size(); i++) options[i] = "Replace old pairing " + candidates.get(i);
-        options[candidates.size()] = "Add as separate trip (only if no old trip was replaced)";
-        new AlertDialog.Builder(this).setTitle("Which trip was replaced?")
-            .setMessage("Select the superseded pairing. All of its old legs, including removed deadheads, will be deleted. Other pairings stay unchanged.")
-            .setItems(options, (d, selected) -> {
-                String replaced = selected < candidates.size() ? candidates.get(selected) : null;
-                if (replaced == null && !candidates.isEmpty()) {
-                    new AlertDialog.Builder(this).setTitle("Replacement required")
-                        .setMessage("Flights already exist near these dates. Adding another version would stack old and new flights and could show an obsolete deadhead. Select the pairing being replaced, or cancel. No changes were saved.")
-                        .setPositiveButton("Choose pairing", (again, ignored) -> chooseReplacement(text, type, pairing, preview))
-                        .setNegativeButton("Cancel", null).show();
+        String[] options = new String[candidates.size()];
+        boolean[] selected = new boolean[candidates.size()];
+        for (int i = 0; i < candidates.size(); i++) {
+            FlightLeg old = candidates.get(i);
+            options[i] = old.departureZulu() + "  " + old.flightNumber() + "  "
+                + old.origin() + " → " + old.destination() + "  " + old.seatPosition()
+                + (old.pairing().isBlank() ? "" : "  [" + old.pairing() + "]");
+        }
+        new AlertDialog.Builder(this).setTitle("Select ONLY obsolete flight legs")
+            .setMessage("Check each old flight that this revision replaces. Leave completed flights and unrelated trips unchecked. Include obsolete deadheads. Nothing is removed until you confirm.")
+            .setMultiChoiceItems(options, selected, (dialog, index, checked) -> selected[index] = checked)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Review replacement", (dialog, which) -> {
+                List<FlightLeg> oldLegs = new ArrayList<>();
+                for (int i = 0; i < selected.length; i++)
+                    if (selected[i]) oldLegs.add(candidates.get(i));
+                if (oldLegs.isEmpty()) {
+                    new AlertDialog.Builder(this).setTitle("No old flights selected")
+                        .setMessage("No schedule was changed. Select the old legs to replace, or cancel.")
+                        .setNegativeButton("Cancel", null)
+                        .setPositiveButton("Select flights", (d, w) -> chooseReplacement(text, type, pairing, preview)).show();
                     return;
                 }
-                if (replaced == null) return;
-                final Instant cutoff;
-                try { cutoff = repository.revisionCutoff(preview, replaced); }
-                catch (IllegalArgumentException error) {
-                    new AlertDialog.Builder(this).setTitle("Cannot safely match revision")
-                        .setMessage(error.getMessage() + " No flights were changed.")
-                        .setPositiveButton("OK", null).show();
-                    return;
-                }
-                List<FlightLeg> removed = repository.supersededLegs(replaced, cutoff);
-                StringBuilder changes = new StringBuilder("REMOVE superseded legs:\\n");
-                for (FlightLeg old : removed)
+                StringBuilder changes = new StringBuilder("REMOVE selected old legs:\n");
+                for (FlightLeg old : oldLegs)
                     changes.append(old.departureZulu()).append("  ").append(old.flightNumber())
                         .append(" ").append(old.origin()).append("→").append(old.destination())
-                        .append(" ").append(old.seatPosition()).append("\\n");
-                changes.append("\\nADD revised legs:\\n");
+                        .append(" ").append(old.seatPosition()).append("\n");
+                changes.append("\nADD imported revised legs:\n");
                 for (FlightLeg leg : preview)
                     changes.append(leg.departureZulu()).append("  ").append(leg.flightNumber())
                         .append(" ").append(leg.origin()).append("→").append(leg.destination())
-                        .append(" ").append(leg.seatPosition()).append("\\n");
-                changes.append("\\nEarlier legs and other pairings remain. Check deadheads carefully.");
-                new AlertDialog.Builder(this).setTitle("Review trip-continuity revision")
+                        .append(" ").append(leg.seatPosition()).append("\n");
+                changes.append("\nAll unchecked flights remain unchanged. Verify deadheads against Crew Access.");
+                new AlertDialog.Builder(this).setTitle("Confirm individual leg replacement")
                     .setMessage(changes.toString())
                     .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Replace these legs", (confirm, w) -> {
+                    .setPositiveButton("Replace selected legs", (d, w) -> {
                         try {
-                            repository.replaceRemainingTrip(preview, replaced, cutoff);
+                            repository.replaceSelectedLegs(preview, oldLegs);
                             showMonth(); showDay(selectedDate);
-                            Toast.makeText(this, "Revised trip saved", Toast.LENGTH_LONG).show();
+                            Toast.makeText(this, "Replaced " + oldLegs.size() + " old legs with "
+                                + preview.size() + " revised legs", Toast.LENGTH_LONG).show();
                         } catch (RuntimeException error) { importError(error); }
                     }).show();
-            }).setNegativeButton("Cancel", null).show();
+            }).show();
     }
 
     private void importText(String text, FlightLeg.ChangeType requestedType, String pairing, boolean persist) {

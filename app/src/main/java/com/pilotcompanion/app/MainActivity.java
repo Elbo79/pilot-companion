@@ -331,6 +331,7 @@ public final class MainActivity extends Activity {
             }
             StringBuilder summary = new StringBuilder("Found " + preview.size() + " flight(s). Review before saving:\n\n");
             for (FlightLeg leg : preview) {
+                summary.append("Seat ").append(leg.seatPosition()).append("  ");
                 summary.append(leg.flightNumber()).append("  ").append(leg.origin()).append(" → ")
                     .append(leg.destination()).append("\n")
                     .append(leg.departureZulu()).append(" → ").append(leg.arrivalZulu()).append("\n");
@@ -355,11 +356,18 @@ public final class MainActivity extends Activity {
         }
         String[] options = new String[candidates.size() + 1];
         for (int i = 0; i < candidates.size(); i++) options[i] = "Replace old pairing " + candidates.get(i);
-        options[candidates.size()] = "Keep all old trips (add only)";
+        options[candidates.size()] = "Add as separate trip (only if no old trip was replaced)";
         new AlertDialog.Builder(this).setTitle("Which trip was replaced?")
             .setMessage("Select the superseded pairing. All of its old legs, including removed deadheads, will be deleted. Other pairings stay unchanged.")
             .setItems(options, (d, selected) -> {
                 String replaced = selected < candidates.size() ? candidates.get(selected) : null;
+                if (replaced == null && !candidates.isEmpty()) {
+                    new AlertDialog.Builder(this).setTitle("Replacement required")
+                        .setMessage("Flights already exist near these dates. Adding another version would stack old and new flights and could show an obsolete deadhead. Select the pairing being replaced, or cancel. No changes were saved.")
+                        .setPositiveButton("Choose pairing", (again, ignored) -> chooseReplacement(text, type, pairing, preview))
+                        .setNegativeButton("Cancel", null).show();
+                    return;
+                }
                 new AlertDialog.Builder(this).setTitle("Confirm schedule change")
                     .setMessage(replaced == null ? "Add the new flights without removing any existing trip?" :
                         "Remove ALL legs of old pairing " + replaced + " and save " + preview.size() + " new flights? This cannot be undone.")

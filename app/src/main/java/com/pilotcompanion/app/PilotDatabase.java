@@ -89,6 +89,10 @@ final class PilotDatabase extends SQLiteOpenHelper {
             db.setTransactionSuccessful();
         }finally{db.endTransaction();}
     }
+    void removePairing(String pairing) {
+        if (pairing == null || pairing.isBlank()) throw new IllegalArgumentException("Pairing required");
+        getWritableDatabase().delete("flights", "pairing=?", new String[]{pairing});
+    }
     List<FlightLeg> loadFlights() {
         List<FlightLeg> list=new ArrayList<>();
         try(Cursor c=getReadableDatabase().rawQuery("SELECT flight,origin,destination,departure,arrival,scheduled_departure,scheduled_arrival,assignment,source,hotel,change_type,pairing FROM flights ORDER BY departure",null)){

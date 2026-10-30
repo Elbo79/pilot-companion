@@ -114,6 +114,8 @@ public final class MainActivity extends Activity {
         syncStatus = label("Shared schedule: connecting…", 10, 0xFFB8C7D9);
         actions.addView(upload, new LinearLayout.LayoutParams(0, dp(48), 1));
         actions.addView(sync, new LinearLayout.LayoutParams(0, dp(48), 1)); root.addView(actions); root.addView(syncStatus);
+        Button removeOld = smallButton("Remove superseded trip"); root.addView(removeOld);
+        removeOld.setOnClickListener(v -> showRemoveOldTrip());
         upload.setOnClickListener(v -> openSchedulePicker()); sync.setOnClickListener(v -> syncFromCloud());
 
         LinearLayout controls = new LinearLayout(this); controls.setGravity(Gravity.CENTER_VERTICAL);
@@ -311,6 +313,35 @@ public final class MainActivity extends Activity {
     private void importError(Throwable error) {
         android.util.Log.e("PilotCompanion", "Schedule import failed", error);
         Toast.makeText(this, "Import failed. Your existing schedule was not changed.", Toast.LENGTH_LONG).show();
+    }
+
+    private void showRemoveOldTrip() {
+        List<String> pairings = repository.allPairings();
+        if (pairings.isEmpty()) {
+            new AlertDialog.Builder(this).setTitle("No trips to remove")
+                .setMessage("No saved pairings were found.").setPositiveButton("OK", null).show();
+            return;
+        }
+        new AlertDialog.Builder(this).setTitle("Select obsolete pairing")
+            .setMessage("Only remove a trip after confirming its flights are no longer assigned in Crew Access. This removes ALL legs, including deadheads.")
+            .setItems(pairings.toArray(new String[0]), (dialog, index) -> {
+                String pairing = pairings.get(index);
+                List<FlightLeg> legs = repository.flightsForPairing(pairing);
+                StringBuilder details = new StringBuilder("Remove " + legs.size() + " legs of " + pairing + "?\\n\\n");
+                for (FlightLeg leg : legs)
+                    details.append(leg.departureZulu()).append("  ").append(leg.flightNumber())
+                        .append(" ").append(leg.origin()).append("→").append(leg.destination())
+                        .append(" ").append(leg.seatPosition()).append("\\n");
+                details.append("\\nThis cannot be undone. Other pairings are retained.");
+                new AlertDialog.Builder(this).setTitle("Confirm obsolete trip removal")
+                    .setMessage(details.toString())
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Remove trip", (confirm, which) -> {
+                        repository.removePairing(pairing);
+                        showMonth(); showDay(selectedDate);
+                        Toast.makeText(this, "Removed obsolete trip " + pairing, Toast.LENGTH_LONG).show();
+                    }).show();
+            }).setNegativeButton("Cancel", null).show();
     }
 
     private void chooseImportType(String text) {

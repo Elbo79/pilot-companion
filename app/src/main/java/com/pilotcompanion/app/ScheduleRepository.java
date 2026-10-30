@@ -27,6 +27,26 @@ final class ScheduleRepository {
             mergeInMemory(imported);
         }
     }
+    List<String> allPairings() {
+        Set<String> names = new TreeSet<>();
+        for (List<FlightLeg> day : schedule.values()) for (FlightLeg leg : day)
+            if (leg.pairing() != null && !leg.pairing().isBlank()) names.add(leg.pairing());
+        return new ArrayList<>(names);
+    }
+    List<FlightLeg> flightsForPairing(String pairing) {
+        List<FlightLeg> legs = new ArrayList<>();
+        for (List<FlightLeg> day : schedule.values()) for (FlightLeg leg : day)
+            if (pairing.equals(leg.pairing())) legs.add(leg);
+        legs.sort(Comparator.comparing(l -> l.departure().toInstant()));
+        return legs;
+    }
+    void removePairing(String pairing) {
+        if (database != null) {
+            database.removePairing(pairing);
+            schedule.clear();
+            mergeInMemory(database.loadFlights());
+        } else for (List<FlightLeg> day : schedule.values()) day.removeIf(l -> pairing.equals(l.pairing()));
+    }
     List<String> candidatePairings(List<FlightLeg> incoming) {
         if (incoming.isEmpty()) return List.of();
         Instant first = incoming.stream().map(l -> l.departure().toInstant()).min(Instant::compareTo).orElseThrow();

@@ -98,6 +98,17 @@ final class PilotDatabase extends SQLiteOpenHelper {
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
     }
+    void replaceSelectedLegs(List<FlightLeg> incoming, List<FlightLeg> superseded) {
+        if (incoming.isEmpty() || superseded.isEmpty()) throw new IllegalArgumentException("Select replacement flights");
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (FlightLeg old : superseded)
+                db.delete("flights", "identity=?", new String[]{identity(old)});
+            for (FlightLeg leg : incoming) insert(db, leg);
+            db.setTransactionSuccessful();
+        } finally { db.endTransaction(); }
+    }
     void removePairing(String pairing) {
         if (pairing == null || pairing.isBlank()) throw new IllegalArgumentException("Pairing required");
         getWritableDatabase().delete("flights", "pairing=?", new String[]{pairing});

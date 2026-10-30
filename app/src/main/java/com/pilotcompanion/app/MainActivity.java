@@ -394,8 +394,9 @@ public final class MainActivity extends Activity {
                 + old.origin() + " → " + old.destination() + "  " + old.seatPosition()
                 + (old.pairing().isBlank() ? "" : "  [" + old.pairing() + "]");
         }
-        new AlertDialog.Builder(this).setTitle("Select ONLY obsolete flight legs")
-            .setMessage("Check each old flight that this revision replaces. Leave completed flights and unrelated trips unchecked. Include obsolete deadheads. Nothing is removed until you confirm.")
+        // AlertDialog message and multi-choice list are mutually exclusive content.
+        // Do not call setMessage here: it hides the flight checkboxes on Android.
+        new AlertDialog.Builder(this).setTitle("Select obsolete legs (leave completed flights unchecked)")
             .setMultiChoiceItems(options, selected, (dialog, index, checked) -> selected[index] = checked)
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Review replacement", (dialog, which) -> {

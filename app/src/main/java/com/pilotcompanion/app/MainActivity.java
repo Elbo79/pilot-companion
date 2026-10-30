@@ -338,19 +338,49 @@ public final class MainActivity extends Activity {
             new AlertDialog.Builder(this).setTitle("Confirm imported flights")
                 .setMessage(summary.toString())
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Save to schedule", (d, w) -> importText(text, type, pairing, true))
+                .setPositiveButton("Choose trip to replace", (d, w) -> chooseReplacement(text, type, pairing, preview))
                 .show();
         }).show();
     }
 
+    private void chooseReplacement(String text, FlightLeg.ChangeType type, String pairing, List<FlightLeg> preview) {
+        List<String> candidates = repository.candidatePairings(preview);
+        if (candidates.isEmpty()) {
+            new AlertDialog.Builder(this).setTitle("No existing pairing found")
+                .setMessage("No existing trip was found near these dates. Importing will add flights, not replace any. Continue only if this is a new trip.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Add new trip", (d, w) -> importText(text, type, pairing, true, null))
+                .show();
+            return;
+        }
+        String[] options = new String[candidates.size() + 1];
+        for (int i = 0; i < candidates.size(); i++) options[i] = "Replace old pairing " + candidates.get(i);
+        options[candidates.size()] = "Keep all old trips (add only)";
+        new AlertDialog.Builder(this).setTitle("Which trip was replaced?")
+            .setMessage("Select the superseded pairing. All of its old legs, including removed deadheads, will be deleted. Other pairings stay unchanged.")
+            .setItems(options, (d, selected) -> {
+                String replaced = selected < candidates.size() ? candidates.get(selected) : null;
+                new AlertDialog.Builder(this).setTitle("Confirm schedule change")
+                    .setMessage(replaced == null ? "Add the new flights without removing any existing trip?" :
+                        "Remove ALL legs of old pairing " + replaced + " and save " + preview.size() + " new flights? This cannot be undone.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Confirm", (confirm, w) -> importText(text, type, pairing, true, replaced))
+                    .show();
+            }).setNegativeButton("Cancel", null).show();
+    }
+
     private void importText(String text, FlightLeg.ChangeType requestedType, String pairing, boolean persist) {
+        importText(text, requestedType, pairing, persist, null);
+    }
+
+    private void importText(String text, FlightLeg.ChangeType requestedType, String pairing, boolean persist, String replacedPairing) {
         try {
         List<FlightLeg> legs = ScheduleImportParser.parseCrewAccessText(text, requestedType, pairing);
         if (legs.isEmpty()) { Toast.makeText(this, "I could not find Crew Access flight cards in that file yet.", Toast.LENGTH_LONG).show(); return; }
         Instant firstDeparture = legs.stream().map(l -> l.departure().toInstant()).min(Instant::compareTo).orElse(Instant.MAX);
         FlightLeg.ChangeType effective = requestedType;
         if (requestedType == FlightLeg.ChangeType.TRADED && Instant.now().isAfter(firstDeparture)) { effective = FlightLeg.ChangeType.REVISED; legs = ScheduleImportParser.parseCrewAccessText(text, effective, pairing); }
-        repository.mergeImported(legs);
+        repository.mergeReplacing(legs, replacedPairing);
         // Imported legs are persisted in SQLite by ScheduleRepository.mergeImported.
         selectedDate = LocalDate.now();
         currentPeriod = PayPeriodCalculator.containing(selectedDate);

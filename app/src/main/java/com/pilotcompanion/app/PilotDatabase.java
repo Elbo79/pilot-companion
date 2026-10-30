@@ -89,6 +89,15 @@ final class PilotDatabase extends SQLiteOpenHelper {
             db.setTransactionSuccessful();
         }finally{db.endTransaction();}
     }
+    void replaceRemainingTrip(List<FlightLeg> incoming, String pairing, Instant cutoff) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.delete("flights", "pairing=? AND departure>=?", new String[]{pairing, cutoff.toString()});
+            for (FlightLeg leg : incoming) insert(db, leg);
+            db.setTransactionSuccessful();
+        } finally { db.endTransaction(); }
+    }
     void removePairing(String pairing) {
         if (pairing == null || pairing.isBlank()) throw new IllegalArgumentException("Pairing required");
         getWritableDatabase().delete("flights", "pairing=?", new String[]{pairing});

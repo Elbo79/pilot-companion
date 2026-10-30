@@ -399,12 +399,37 @@ public final class MainActivity extends Activity {
                         .setNegativeButton("Cancel", null).show();
                     return;
                 }
-                new AlertDialog.Builder(this).setTitle("Confirm schedule change")
-                    .setMessage(replaced == null ? "Add the new flights without removing any existing trip?" :
-                        "Remove ALL legs of old pairing " + replaced + " and save " + preview.size() + " new flights? This cannot be undone.")
+                if (replaced == null) return;
+                final Instant cutoff;
+                try { cutoff = repository.revisionCutoff(preview, replaced); }
+                catch (IllegalArgumentException error) {
+                    new AlertDialog.Builder(this).setTitle("Cannot safely match revision")
+                        .setMessage(error.getMessage() + " No flights were changed.")
+                        .setPositiveButton("OK", null).show();
+                    return;
+                }
+                List<FlightLeg> removed = repository.supersededLegs(replaced, cutoff);
+                StringBuilder changes = new StringBuilder("REMOVE superseded legs:\\n");
+                for (FlightLeg old : removed)
+                    changes.append(old.departureZulu()).append("  ").append(old.flightNumber())
+                        .append(" ").append(old.origin()).append("→").append(old.destination())
+                        .append(" ").append(old.seatPosition()).append("\\n");
+                changes.append("\\nADD revised legs:\\n");
+                for (FlightLeg leg : preview)
+                    changes.append(leg.departureZulu()).append("  ").append(leg.flightNumber())
+                        .append(" ").append(leg.origin()).append("→").append(leg.destination())
+                        .append(" ").append(leg.seatPosition()).append("\\n");
+                changes.append("\\nEarlier legs and other pairings remain. Check deadheads carefully.");
+                new AlertDialog.Builder(this).setTitle("Review trip-continuity revision")
+                    .setMessage(changes.toString())
                     .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Confirm", (confirm, w) -> importText(text, type, pairing, true, replaced))
-                    .show();
+                    .setPositiveButton("Replace these legs", (confirm, w) -> {
+                        try {
+                            repository.replaceRemainingTrip(preview, replaced, cutoff);
+                            showMonth(); showDay(selectedDate);
+                            Toast.makeText(this, "Revised trip saved", Toast.LENGTH_LONG).show();
+                        } catch (RuntimeException error) { importError(error); }
+                    }).show();
             }).setNegativeButton("Cancel", null).show();
     }
 

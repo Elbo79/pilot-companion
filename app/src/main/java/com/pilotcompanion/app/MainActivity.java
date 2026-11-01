@@ -484,7 +484,7 @@ public final class MainActivity extends Activity {
         new Thread(() -> {
             try {
                 List<FlightLeg> legs = ScheduleImportParser.parseSharedFormat(CloudScheduleSync.download());
-                runOnUiThread(() -> { repository.mergeImported(legs); if (syncStatus != null) syncStatus.setText("Shared schedule: synced • " + legs.size() + " flights"); showDay(selectedDate); });
+                runOnUiThread(() -> { List<FlightLeg> safe = new ArrayList<>(); for (FlightLeg leg : legs) { Instant dep = leg.departure().toInstant(); boolean novemberRoster = !dep.isBefore(Instant.parse("2026-11-05T00:00:00Z")) && dep.isBefore(Instant.parse("2026-11-28T00:00:00Z")) && (leg.origin().equals("ANC") || leg.origin().equals("SZX") || leg.origin().equals("HKG") || leg.origin().equals("SDF") || leg.origin().equals("CGN")); if (!novemberRoster) safe.add(leg); } repository.mergeImported(safe); if (syncStatus != null) syncStatus.setText("Shared schedule: synced • current November roster protected"); showMonth(); showDay(selectedDate); });
             } catch (Exception error) { runOnUiThread(() -> { if (syncStatus != null) syncStatus.setText("Shared schedule: offline • using saved schedule"); }); }
         }).start();
     }

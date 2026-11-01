@@ -13,7 +13,7 @@ import java.util.*;
 
 final class PilotDatabase extends SQLiteOpenHelper {
     private final Context context;
-    PilotDatabase(Context context) { super(context, "pilot_schedule.db", null, 3); this.context=context.getApplicationContext(); }
+    PilotDatabase(Context context) { super(context, "pilot_schedule.db", null, 4); this.context=context.getApplicationContext(); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE flights (identity TEXT PRIMARY KEY, flight TEXT NOT NULL, origin TEXT NOT NULL, destination TEXT NOT NULL, departure TEXT NOT NULL, arrival TEXT NOT NULL, scheduled_departure TEXT NOT NULL, scheduled_arrival TEXT NOT NULL, assignment TEXT, source TEXT, hotel TEXT, change_type TEXT, pairing TEXT)");
         db.execSQL("CREATE INDEX idx_flights_departure ON flights(departure)");
@@ -29,6 +29,28 @@ final class PilotDatabase extends SQLiteOpenHelper {
             seedNovember(db);
         }
         if(oldVersion<3)db.execSQL("CREATE TABLE IF NOT EXISTS day_status (date TEXT PRIMARY KEY, status TEXT NOT NULL)");
+        if(oldVersion<4)reconcileNovemberRoster(db);
+    }
+    private void reconcileNovemberRoster(SQLiteDatabase db) {
+        // Correct ONLY the November trip windows shown in the current Crew Access
+        // screenshots. Preserve October flights, unrelated November flights, and dates.
+        db.beginTransaction();
+        try {
+            db.delete("flights",
+                "((departure>=? AND departure<? AND " +
+                "((origin='ANC' AND destination IN ('SZX','HKG')) OR " +
+                "(origin='SZX' AND destination='ANC') OR " +
+                "(origin='HKG' AND destination IN ('ANC','SZX')))) OR " +
+                "(departure>=? AND departure<? AND " +
+                "((origin='ANC' AND destination='SDF') OR " +
+                "(origin='SDF' AND destination='CGN') OR " +
+                "(origin='CGN' AND destination='SZX') OR " +
+                "(origin='SZX' AND destination='ANC'))))",
+                new String[]{"2026-11-05T00:00:00Z","2026-11-16T00:00:00Z",
+                    "2026-11-22T00:00:00Z","2026-11-28T00:00:00Z"});
+            seedNovember(db);
+            db.setTransactionSuccessful();
+        } finally { db.endTransaction(); }
     }
     private void seedNovember(SQLiteDatabase db){
         try{

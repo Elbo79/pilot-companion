@@ -242,11 +242,14 @@ public final class MainActivity extends Activity {
         Instant firstDeparture = legs.stream().map(l -> l.departure().toInstant()).min(Instant::compareTo).orElse(Instant.MAX);
         FlightLeg.ChangeType effective = requestedType;
         if (requestedType == FlightLeg.ChangeType.TRADED && Instant.now().isAfter(firstDeparture)) { effective = FlightLeg.ChangeType.REVISED; legs = ScheduleImportParser.parseCrewAccessText(text, effective, pairing); }
-        repository.mergeImported(legs);
+        try {
+            repository.mergeImported(legs);
+        } catch (RuntimeException error) {
+            Toast.makeText(this, "Replacement not applied. Original flights preserved: " + error.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
         if (persist) getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("import_text", text).putString("import_type", effective.name()).putString("import_pairing", pairing).apply();
-        selectedDate = LocalDate.now();
-        currentPeriod = PayPeriodCalculator.containing(selectedDate);
-        visibleMonth = YearMonth.from(currentPeriod.end());
+        // Keep the pilot on the date they were reviewing after an import.
         showMonth(); showDay(selectedDate); Toast.makeText(this, "Schedule imported: " + legs.size() + " flights", Toast.LENGTH_SHORT).show();
     }
 

@@ -55,12 +55,30 @@ final class ScheduleRepository {
     }
 
     void mergeImported(List<FlightLeg> imported) {
+        // Stage a complete copy first: never remove an existing flight until all
+        // incoming legs have been checked and the replacement is ready to commit.
+        if (imported == null || imported.isEmpty()) return;
+        Map<LocalDate, List<FlightLeg>> staged = new HashMap<>();
+        for (Map.Entry<LocalDate, List<FlightLeg>> entry : schedule.entrySet()) {
+            staged.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
         for (FlightLeg leg : imported) {
-            for (List<FlightLeg> existing : schedule.values()) {
+            if (leg == null || leg.flightNumber() == null || leg.flightNumber().isBlank()
+                    || leg.origin() == null || leg.origin().isBlank()
+                    || leg.destination() == null || leg.destination().isBlank()
+                    || leg.departure() == null || leg.arrival() == null
+                    || !leg.arrival().toInstant().isAfter(leg.departure().toInstant())) {
+                throw new IllegalArgumentException("Invalid replacement flight; original schedule retained");
+            }
+            for (List<FlightLeg> existing : staged.values()) {
                 existing.removeIf(old -> sameLegIdentity(old, leg));
             }
-            schedule.computeIfAbsent(leg.departure().toLocalDate(), ignored -> new ArrayList<>()).add(leg);
+            staged.computeIfAbsent(leg.departure().toLocalDate(), ignored -> new ArrayList<>()).add(leg);
         }
+        schedule.clear();
+        staged.forEach((date, legs) -> {
+            if (!legs.isEmpty()) schedule.put(date, legs);
+        });
     }
 
     private static boolean sameLegIdentity(FlightLeg old, FlightLeg incoming) {

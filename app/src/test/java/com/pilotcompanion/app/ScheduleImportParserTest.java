@@ -69,4 +69,24 @@ public class ScheduleImportParserTest {
         assertEquals(1, legs.size());
         assertEquals("A70659", legs.get(0).pairing());
     }
+
+    @Test public void expandedRosterKeepsOutboundAndReturnOnCorrectDates() {
+        String text = "Nov 08 16:56 - Nov 11 19:32 (4d) Trip 20173 R/O ANC 747 HKG " +
+                "Nov 08 18:29 - Nov 09 06:03 UPS60 Pos AC ANC - HKG DH 747 " +
+                "Nov 09 06:33 - Nov 11 08:00 HKG - New World Millennium 49:27h " +
+                "Nov 11 09:30 - Nov 11 19:02 UPS61 Pos AC Block HKG - ANC R/O 747 9:32h";
+        List<FlightLeg> legs = ScheduleImportParser.parseCrewAccessText(
+                text, FlightLeg.ChangeType.REVISED, "20173");
+        assertEquals(2, legs.size());
+        assertEquals("UPS60", legs.get(0).flightNumber());
+        assertEquals("ANC", legs.get(0).origin());
+        assertEquals("HKG", legs.get(0).destination());
+        assertEquals("DH", legs.get(0).seatPosition());
+        assertEquals("Nov 8 18:29Z", legs.get(0).departureZulu());
+        assertEquals("UPS61", legs.get(1).flightNumber());
+        assertEquals("HKG", legs.get(1).origin());
+        assertEquals("ANC", legs.get(1).destination());
+        assertEquals("R/O", legs.get(1).seatPosition());
+        assertEquals("Nov 11 09:30Z", legs.get(1).departureZulu());
+    }
 }

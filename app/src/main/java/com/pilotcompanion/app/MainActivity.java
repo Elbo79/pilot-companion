@@ -237,6 +237,7 @@ public final class MainActivity extends Activity {
     }
 
     private void importText(String text, FlightLeg.ChangeType requestedType, String pairing, boolean persist) {
+        try {
         List<FlightLeg> legs = ScheduleImportParser.parseCrewAccessText(text, requestedType, pairing);
         if (legs.isEmpty()) { Toast.makeText(this, "I could not find Crew Access flight cards in that file yet.", Toast.LENGTH_LONG).show(); return; }
         Instant firstDeparture = legs.stream().map(l -> l.departure().toInstant()).min(Instant::compareTo).orElse(Instant.MAX);
@@ -251,8 +252,15 @@ public final class MainActivity extends Activity {
         if (persist) getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("import_text", text).putString("import_type", effective.name()).putString("import_pairing", pairing).apply();
         // Keep the pilot on the date they were reviewing after an import.
         showMonth(); showDay(selectedDate); Toast.makeText(this, "Schedule imported: " + legs.size() + " flights", Toast.LENGTH_SHORT).show();
+        } catch (Exception error) {
+            android.util.Log.e("PilotCompanionImport", "Schedule import failed", error);
+            new AlertDialog.Builder(this).setTitle("Schedule not replaced")
+                    .setMessage("Your previous schedule has been retained where possible. Import error: "
+                            + error.getClass().getSimpleName() + ": " + error.getMessage()
+                            + "\n\nPlease capture this message so the importer can be repaired.")
+                    .setPositiveButton("OK", null).show();
+        }
     }
-
     private void restoreLastImport() {
         String text = getSharedPreferences(PREFS, MODE_PRIVATE).getString("import_text", ""); if (text.isBlank()) return;
         try {

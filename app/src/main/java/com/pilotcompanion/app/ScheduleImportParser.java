@@ -29,7 +29,9 @@ final class ScheduleImportParser {
     private static final Pattern CLOCK = Pattern.compile("\\b(\\d{1,2}:\\d{2})\\b");
 
     static List<FlightLeg> parseCrewAccessText(String text, FlightLeg.ChangeType requestedType, String pairing) {
-        List<FlightLeg> result = parseTripInformation(text, requestedType, pairing);
+        // parseTripInformation returns List.of() when the image is not a Trip Information page.
+        // Always use a mutable list before appending fallback Crew Access card matches.
+        List<FlightLeg> result = new ArrayList<>(parseTripInformation(text, requestedType, pairing));
         if (!result.isEmpty()) return result;
 
         String normalized = normalize(text);

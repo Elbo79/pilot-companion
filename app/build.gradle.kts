@@ -15,8 +15,27 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Signing material is supplied only by GitHub Actions secrets or local environment.
+    // Never commit a keystore or passwords to this repository.
+    val signingPath = System.getenv("PILOT_SIGNING_STORE_FILE")
+    val signingPassword = System.getenv("PILOT_SIGNING_STORE_PASSWORD")
+    val signingAlias = System.getenv("PILOT_SIGNING_KEY_ALIAS")
+    val signingKeyPassword = System.getenv("PILOT_SIGNING_KEY_PASSWORD")
+    val hasReleaseSigning = listOf(signingPath, signingPassword, signingAlias, signingKeyPassword)
+        .all { !it.isNullOrBlank() }
+    if (hasReleaseSigning) {
+        signingConfigs {
+            create("pilotRelease") {
+                storeFile = file(signingPath!!)
+                storePassword = signingPassword
+                keyAlias = signingAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("pilotRelease")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

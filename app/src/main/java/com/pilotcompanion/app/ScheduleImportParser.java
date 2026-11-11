@@ -28,7 +28,54 @@ final class ScheduleImportParser {
     private static final Pattern FLIGHT_BEFORE = Pattern.compile("(?i)(DH\\s*)?(?:UPS\\s*)?(\\d{2,4})\\b");
     private static final Pattern CLOCK = Pattern.compile("\\b(\\d{1,2}:\\d{2})\\b");
 
+    // Each expanded Crew Access roster flight has its own date/time range.
+    // Never attach a subsequent flight number to an earlier range.
+    private static final Pattern ROSTER_RANGE = Pattern.compile(
+            "(?i)\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+(\\d{1,2})\\s+(\\d{1,2}:\\d{2})\\s*[-–]\\s*" +
+            "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+(\\d{1,2})\\s+(\\d{1,2}:\\d{2})\\b");
+    private static final Pattern ROSTER_FLIGHT = Pattern.compile("(?i)\\bUPS\\s*(\\d{1,4})\\b");
+    private static final Pattern ROSTER_ROUTE = Pattern.compile("(?i)\\b([A-Z]{3})\\s*[-–>]\\s*([A-Z]{3})\\b");
+
+    private static List<FlightLeg> parseExpandedRoster(String text, FlightLeg.ChangeType type, String pairing) {
+        String normalized = normalize(text);
+        Matcher ranges = ROSTER_RANGE.matcher(normalized);
+        List<FlightLeg> legs = new ArrayList<>();
+        List<int[]> spans = new ArrayList<>();
+        List<String[]> dates = new ArrayList<>();
+        while (ranges.find()) {
+            spans.add(new int[]{ranges.start(), ranges.end()});
+            dates.add(new String[]{ranges.group(1), ranges.group(2), ranges.group(3),
+                    ranges.group(4), ranges.group(5), ranges.group(6)});
+        }
+        for (int i = 0; i < spans.size(); i++) {
+            int begin = spans.get(i)[1];
+            int end = i + 1 < spans.size() ? spans.get(i + 1)[0] : normalized.length();
+            String segment = normalized.substring(begin, end);
+            Matcher flight = ROSTER_FLIGHT.matcher(segment);
+            Matcher route = ROSTER_ROUTE.matcher(segment);
+            if (!flight.find() || !route.find()) continue;
+            String[] date = dates.get(i);
+            try {
+                LocalDate departureDate = LocalDate.of(2026, month(date[0]), Integer.parseInt(date[1]));
+                LocalDate arrivalDate = LocalDate.of(2026, month(date[3]), Integer.parseInt(date[4]));
+                ZonedDateTime departure = ZonedDateTime.parse(departureDate + "T" + twoDigitTime(date[2]) + "Z");
+                ZonedDateTime arrival = ZonedDateTime.parse(arrivalDate + "T" + twoDigitTime(date[5]) + "Z");
+                if (!arrival.isAfter(departure)) continue;
+                String origin = route.group(1).toUpperCase(Locale.US);
+                String destination = route.group(2).toUpperCase(Locale.US);
+                boolean deadhead = Pattern.compile("(?i)\\bDH\\b").matcher(segment).find();
+                String seat = deadhead ? "DH" :
+                        Pattern.compile("(?i)\\bR/O\\b").matcher(segment).find() ? "R/O" : "F/O";
+                legs.add(make("UPS" + flight.group(1), origin, destination, departure, arrival,
+                        seat, type, pairing, null, "Imported Crew Access expanded roster"));
+            } catch (RuntimeException ignored) { }
+        }
+        return legs;
+    }
+
     static List<FlightLeg> parseCrewAccessText(String text, FlightLeg.ChangeType requestedType, String pairing) {
+        List<FlightLeg> expanded = parseExpandedRoster(text, requestedType, pairing);
+        if (!expanded.isEmpty()) return expanded;
         // parseTripInformation returns List.of() when the image is not a Trip Information page.
         // Always use a mutable list before appending fallback Crew Access card matches.
         List<FlightLeg> result = new ArrayList<>(parseTripInformation(text, requestedType, pairing));

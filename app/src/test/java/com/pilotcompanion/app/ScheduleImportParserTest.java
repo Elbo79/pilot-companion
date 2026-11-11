@@ -86,7 +86,8 @@ public class ScheduleImportParserTest {
         assertEquals("UPS61", legs.get(1).flightNumber());
         assertEquals("HKG", legs.get(1).origin());
         assertEquals("ANC", legs.get(1).destination());
-        assertEquals("R/O", legs.get(1).seatPosition());
+        assertEquals("R/O", legs.get(1).assignment());
+        assertEquals("RO", legs.get(1).seatPosition());
         assertEquals("Nov 11 09:30Z", legs.get(1).departureZulu());
     }
 }

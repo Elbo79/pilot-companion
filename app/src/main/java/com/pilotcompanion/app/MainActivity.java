@@ -86,6 +86,9 @@ public final class MainActivity extends Activity {
         actions.addView(sync, new LinearLayout.LayoutParams(0, dp(40), 1)); root.addView(actions); root.addView(syncStatus);
         upload.setOnClickListener(v -> openSchedulePicker()); sync.setOnClickListener(v -> syncFromCloud());
 
+        sync.setOnLongClickListener(v -> { chooseGoogleCalendar(); return true; });
+        syncStatus.setOnClickListener(v -> chooseGoogleCalendar());
+
         LinearLayout controls = new LinearLayout(this); controls.setGravity(Gravity.CENTER_VERTICAL);
         Button previous = button("<"); monthTitle = label("", 22, 0xFFB9DFFF); monthTitle.setGravity(Gravity.CENTER); Button next = button(">");
         controls.addView(previous, new LinearLayout.LayoutParams(dp(44), dp(44)));
@@ -250,6 +253,7 @@ public final class MainActivity extends Activity {
             return;
         }
         if (persist) getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("import_text", text).putString("import_type", effective.name()).putString("import_pairing", pairing).apply();
+        if (persist) exportGoogleCalendar();
         // Keep the pilot on the date they were reviewing after an import.
         showMonth(); showDay(selectedDate); Toast.makeText(this, "Schedule imported: " + legs.size() + " flights", Toast.LENGTH_SHORT).show();
         } catch (Exception error) {
@@ -276,6 +280,47 @@ public final class MainActivity extends Activity {
                 List<FlightLeg> legs = ScheduleImportParser.parseSharedFormat(CloudScheduleSync.download());
                 runOnUiThread(() -> { repository.mergeImported(legs); if (syncStatus != null) syncStatus.setText("Shared schedule: synced • " + legs.size() + " flights"); showDay(selectedDate); });
             } catch (Exception error) { runOnUiThread(() -> { if (syncStatus != null) syncStatus.setText("Shared schedule: offline • using saved schedule"); }); }
+        }).start();
+    }
+
+    private void chooseGoogleCalendar() {
+        if (checkSelfPermission(Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED ||
+                checkSelfPermission(Manifest.permission.WRITE_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR}, 1003);
+            return;
+        }
+        try {
+            List<CalendarExport.Target> targets = CalendarExport.targets(this);
+            if (targets.isEmpty()) { Toast.makeText(this, "No writable Google calendars found", Toast.LENGTH_LONG).show(); return; }
+            String[] names = new String[targets.size()+1];
+            for (int i=0;i<targets.size();i++) names[i]=targets.get(i).name();
+            names[targets.size()]="Turn off calendar sync";
+            new AlertDialog.Builder(this).setTitle("Google Calendar sync").setItems(names,(dialog,index)-> {
+                if (index == targets.size()) {
+                    getSharedPreferences(PREFS,MODE_PRIVATE).edit().remove("google_calendar_id").apply();
+                } else {
+                    new AlertDialog.Builder(this).setTitle("Export flight schedule?")
+                        .setMessage("Pilot Companion will add its flights to "+targets.get(index).name()+" and update matching Pilot Companion events after successful imports.")
+                        .setNegativeButton("Cancel",null).setPositiveButton("Enable",(d,w)->{
+                            getSharedPreferences(PREFS,MODE_PRIVATE).edit().putLong("google_calendar_id",targets.get(index).id()).apply();
+                            exportGoogleCalendar();
+                        }).show();
+                }
+            }).show();
+        } catch (RuntimeException e) { Toast.makeText(this,"Calendar unavailable: "+e.getMessage(),Toast.LENGTH_LONG).show(); }
+    }
+
+    private void exportGoogleCalendar() {
+        long id=getSharedPreferences(PREFS,MODE_PRIVATE).getLong("google_calendar_id",-1);
+        if (id<0) return;
+        List<FlightLeg> snapshot=repository.allFlights();
+        new Thread(()->{
+            try {
+                int count=CalendarExport.export(this,id,snapshot);
+                runOnUiThread(()->Toast.makeText(this,"Google Calendar: "+count+" flights exported",Toast.LENGTH_SHORT).show());
+            } catch (RuntimeException e) {
+                runOnUiThread(()->Toast.makeText(this,"Google Calendar sync failed; schedule retained",Toast.LENGTH_LONG).show());
+            }
         }).start();
     }
 

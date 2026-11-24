@@ -112,6 +112,12 @@ final class ScheduleRepository {
         schedule.computeIfAbsent(departure.toLocalDate(), ignored -> new ArrayList<>()).add(leg);
     }
 
+    void restoreSnapshot(List<FlightLeg> legs) {
+        Map<LocalDate,List<FlightLeg>> restored=new HashMap<>();
+        for(FlightLeg l:legs) restored.computeIfAbsent(l.departure().toLocalDate(),d->new ArrayList<>()).add(l);
+        if(restored.isEmpty()) throw new IllegalArgumentException("Empty snapshot");
+        schedule.clear(); schedule.putAll(restored);
+    }
     List<FlightLeg> allFlights() {
         List<FlightLeg> result = new ArrayList<>();
         for (List<FlightLeg> legs : schedule.values()) result.addAll(legs);

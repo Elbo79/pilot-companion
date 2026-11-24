@@ -112,6 +112,11 @@ final class ScheduleRepository {
         schedule.computeIfAbsent(departure.toLocalDate(), ignored -> new ArrayList<>()).add(leg);
     }
 
+    List<FlightLeg> allFlights() {
+        List<FlightLeg> result = new ArrayList<>();
+        for (List<FlightLeg> legs : schedule.values()) result.addAll(legs);
+        return result;
+    }
     List<FlightLeg> forDate(LocalDate date) { return Collections.unmodifiableList(schedule.getOrDefault(date, List.of())); }
 
     FlightLeg nextAssignmentAfter(Instant instant) {

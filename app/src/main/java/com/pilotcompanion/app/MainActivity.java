@@ -58,6 +58,10 @@ public final class MainActivity extends Activity {
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         restoreLastImport();
+        try {
+            String saved=getSharedPreferences(PREFS,MODE_PRIVATE).getString("schedule_snapshot","");
+            if(!saved.isBlank()) repository.restoreSnapshot(ScheduleBackup.decode(saved));
+        } catch(Exception e) { android.util.Log.e("PilotBackup","Snapshot restore failed",e); }
         selectedDate = LocalDate.now();
         currentPeriod = PayPeriodCalculator.containing(selectedDate);
         visibleMonth = YearMonth.from(currentPeriod.end());
@@ -84,6 +88,7 @@ public final class MainActivity extends Activity {
         syncStatus = label("Shared schedule: connecting…", 10, 0xFFB8C7D9);
         actions.addView(upload, new LinearLayout.LayoutParams(0, dp(40), 1));
         actions.addView(sync, new LinearLayout.LayoutParams(0, dp(40), 1)); root.addView(actions); root.addView(syncStatus);
+        upload.setOnLongClickListener(v -> { backupMenu(); return true; });
         upload.setOnClickListener(v -> openSchedulePicker()); sync.setOnClickListener(v -> syncFromCloud());
 
         sync.setOnLongClickListener(v -> { chooseGoogleCalendar(); return true; });
@@ -220,6 +225,25 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if ((requestCode==1004 || requestCode==1005) && resultCode==RESULT_OK && data!=null && data.getData()!=null) {
+            try {
+                if(requestCode==1004) {
+                    try(java.io.OutputStream out=getContentResolver().openOutputStream(data.getData(),"wt")){
+                        if(out==null) throw new java.io.IOException("Cannot open backup");
+                        out.write(ScheduleBackup.encode(repository.allFlights()).getBytes(StandardCharsets.UTF_8));
+                    }
+                    Toast.makeText(this,"Schedule backup saved",Toast.LENGTH_LONG).show();
+                } else {
+                    List<FlightLeg> restored=ScheduleBackup.decode(readText(data.getData()));
+                    new AlertDialog.Builder(this).setTitle("Restore "+restored.size()+" flights?")
+                        .setMessage("This replaces the current flight schedule. Save a backup first.")
+                        .setNegativeButton("Cancel",null).setPositiveButton("Restore",(d,w)->{
+                            repository.restoreSnapshot(restored); saveSnapshot(); showMonth(); showDay(selectedDate);
+                        }).show();
+                }
+            } catch(Exception e){Toast.makeText(this,"Backup operation failed: "+e.getMessage(),Toast.LENGTH_LONG).show();}
+            return;
+        }
         if (requestCode != IMPORT_REQUEST || resultCode != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData(); String type = getContentResolver().getType(uri);
         try {
@@ -253,7 +277,7 @@ public final class MainActivity extends Activity {
             return;
         }
         if (persist) getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("import_text", text).putString("import_type", effective.name()).putString("import_pairing", pairing).apply();
-        if (persist) exportGoogleCalendar();
+        if (persist) { saveSnapshot(); exportGoogleCalendar(); }
         // Keep the pilot on the date they were reviewing after an import.
         showMonth(); showDay(selectedDate); Toast.makeText(this, "Schedule imported: " + legs.size() + " flights", Toast.LENGTH_SHORT).show();
         } catch (Exception error) {
@@ -278,9 +302,28 @@ public final class MainActivity extends Activity {
         new Thread(() -> {
             try {
                 List<FlightLeg> legs = ScheduleImportParser.parseSharedFormat(CloudScheduleSync.download());
-                runOnUiThread(() -> { repository.mergeImported(legs); if (syncStatus != null) syncStatus.setText("Shared schedule: synced • " + legs.size() + " flights"); showDay(selectedDate); });
+                runOnUiThread(() -> { repository.mergeImported(legs); saveSnapshot(); exportGoogleCalendar(); if (syncStatus != null) syncStatus.setText("Shared schedule: synced • " + legs.size() + " flights"); showDay(selectedDate); });
             } catch (Exception error) { runOnUiThread(() -> { if (syncStatus != null) syncStatus.setText("Shared schedule: offline • using saved schedule"); }); }
         }).start();
+    }
+
+    private void saveSnapshot() {
+        try {
+            if(!getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("schedule_snapshot",ScheduleBackup.encode(repository.allFlights())).commit())
+                throw new java.io.IOException("Storage write failed");
+        } catch(Exception e){Toast.makeText(this,"Schedule persistence failed; export a backup",Toast.LENGTH_LONG).show();}
+    }
+    private void backupMenu() {
+        new AlertDialog.Builder(this).setTitle("Schedule backup").setItems(new String[]{"Save backup file","Restore backup file"},(d,i)->{
+            Intent intent=new Intent(i==0?Intent.ACTION_CREATE_DOCUMENT:Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE); intent.setType("application/json");
+            if(i==0) intent.putExtra(Intent.EXTRA_TITLE,"pilot-companion-backup.json");
+            startActivityForResult(intent,i==0?1004:1005);
+        }).show();
+    }
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
+        super.onRequestPermissionsResult(requestCode,permissions,results);
+        if(requestCode==1003 && results.length==2 && results[0]==PackageManager.PERMISSION_GRANTED && results[1]==PackageManager.PERMISSION_GRANTED) chooseGoogleCalendar();
     }
 
     private void chooseGoogleCalendar() {
